@@ -35,11 +35,8 @@ include("utilities.jl")
 include("opt_design_boscia.jl")
 include("scip_oa.jl")
 include("opt_design_scip.jl")
-include("opt_design_frank_wolfe.jl")
-include("opt_design_hypatia.jl")
 include("spectral_functions_JuMP.jl")
 include("opt_design_pajarito.jl")
 include("opt_design_custom_BB.jl")
-include("opt_design_socp.jl")
 
 end # module optDesign

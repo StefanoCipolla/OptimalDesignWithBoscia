@@ -97,7 +97,6 @@ function solve_opt(seed, m, n, time_limit, criterion, corr; full_callback=true, 
         x, _, result = Boscia.solve(f, grad!, lmo; verbose=verbose, time_limit=time_limit, active_set=active_set, branching_strategy=branching_strategy, use_shadow_set=use_shadow_set, dual_tightening=use_tightening, global_dual_tightening=use_tightening, lazy_tolerance=lazy_tolerance, custom_heuristics=[heu] )
     else
         # Precompile
-        # variant = Boscia.AwayFrankWolfe(),
         _, active_set, S = build_start_point2(A, m, n, N, ub)
         z = greedy_incumbent(A, m, n, N, ub)
         x, _, result = Boscia.solve(f, grad!, lmo; verbose=false, time_limit=10, active_set=active_set, domain_oracle=domain_oracle, start_solution=z, dual_tightening=use_tightening, global_dual_tightening=use_tightening, lazy_tolerance=lazy_tolerance, branching_strategy=branching_strategy, use_shadow_set=use_shadow_set, custom_heuristics=[heu]) #line_search=StepSizeRule, 

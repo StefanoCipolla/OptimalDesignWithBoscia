@@ -53,18 +53,8 @@ function build_lmo(o, m, N, ub)
     MOI.add_constraint(
         o,
         MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(ones(m), x), 0.0),
-        MOI.LessThan(N)
-    )
-    MOI.add_constraint(
-        o,
-        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(ones(m), x), 0.0),
-        MOI.GreaterThan(1.0)
-    )
-    #=MOI.add_constraint(
-        o,
-        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm.(ones(m), x), 0.0),
         MOI.EqualTo(s)
-    )=#
+    )
     lmo = FrankWolfe.MathOptLMO(o)
 
     return lmo, x
@@ -76,14 +66,13 @@ Build Probability Simplex BLMO for Boscia
 function build_blmo(m, N, ub)
     simplex_lmo = Boscia.ProbabilitySimplexSimpleBLMO(N)
     blmo = Boscia.ManagedBoundedLMO(simplex_lmo, fill(0.0, m), ub, collect(1:m), m)
-    #blmo = Boscia.ManagedBoundedLMO(simplex_lmo, fill(0.0, m), ub, m, collect(1:m))
     return blmo
 end
 
 """
 Build function for the A-criterion. 
 """
-function build_a_criterion(A, fusion; μ=1e-5, C=nothing, build_safe=false)
+function build_a_criterion(A, fusion; μ=0.0, C=nothing, build_safe=false)
     m, n = size(A) 
     a=m
     domain_oracle = build_domain_oracle(A, n)
@@ -97,7 +86,6 @@ function build_a_criterion(A, fusion; μ=1e-5, C=nothing, build_safe=false)
         X = Symmetric(X)
         U = cholesky(X)
         X_inv = U \ I
-        #X_inv = LinearAlgebra.inv(X)
         return LinearAlgebra.tr(X_inv)/a 
     end
 
@@ -214,7 +202,6 @@ function build_general_trace(A, p, fusion; C=nothing, μ=0.0, build_safe=false)
     function f_a(x)
         X = fusion ? C + transpose(A)*diagm(x)*A : transpose(A)*diagm(x)*A + Matrix(μ *I, n, n)
         X = Symmetric(X^p)
-       # X_inv = LinearAlgebra.inv(X)
         return LinearAlgebra.tr(X)/a 
     end
 
@@ -321,17 +308,10 @@ function build_matrix_means_objective(A,p;C=nothing)
             Delta = a*d + b*c
             
             if !isapprox(Delta, 0.0)
-             #   println("Delta not 0")
-           #  @show -(b+ sqrt(b^2 -a*Delta)) / Delta
-               # theta = min(max(-(b+ sqrt(b^2 -a*Delta)) / Delta, node.upper_bounds[jdx] - x[jdx]), x[kdx] - node.lower_bounds[kdx])
                 theta = min(-(b+ sqrt(b^2 -a*Delta)) / Delta, node.upper_bounds[jdx] - x[jdx], x[kdx] - node.lower_bounds[kdx])
             elseif isapprox(Delta, 0.0) && !isapprox(b, 0.0)
-               # println("Delta 0 and B not")
-            #   @show - a/(2*b)
-                #theta = min(max(- a/(2*b), node.upper_bounds[jdx] - x[jdx]), x[kdx] - node.lower_bounds[kdx])
                 theta = min(- a/(2*b), node.upper_bounds[jdx] - x[jdx], x[kdx] - node.lower_bounds[kdx])
             elseif isapprox(Delta, 0.0) && isapprox(b, 0.0) && a > 0 - 1e-3
-             #   println("Delta and B 0, A positive")
                 theta = x[kdx] - node.lower_bounds[kdx]
             else
                 error("Delta and b are zero, Delta: $(Delta) b: $(b) but a is not positive a: $(a)")
@@ -362,7 +342,6 @@ Rounding heuristics for the continuous and limit solutions
 """
 function heuristics(y, s, ub, mode)
     k = length(findall(x-> x!= 0.0, y))
-    #    @assert k ≤ s
     z = if mode == "cont"
         round.(y)
     elseif mode == "limit"
@@ -440,49 +419,11 @@ function linearly_independent_rows(A, m ,n)
 end
 
 """
-Build start point used in FrankWolfe and Boscia in case of A-opt and D-opt.
+Build start point used in Boscia in case of A-opt and D-opt.
 The functions are self concordant and so not every point in the feasible region
 is in the domain of f and grad!.
 """
-function start_point(A, m, n, s, ub, mode)
-    # Get n linearly independent rows of A
-    S = linearly_independent_rows(A,m,n)
-    @assert length(S) == n
-
-    x = zeros(m)
-
-    if mode == "FW_limit"
-        V = []
-        for i in S 
-            v = zeros(m)
-            v[i] = 1
-            push!(V, v)
-        end
-        x = sum(V) * 1/n
-        active_set= FrankWolfe.ActiveSet(fill(1/n, n), V, x)
-        @assert isapprox(sum(x),1, atol = 1e-6, rtol=1e-3)
-    elseif mode == "Boscia" || mode == "FW_cont"
-        v = zeros(m)
-        v[S[1]] = min(ub[S[1]], s)
-        active_set = FrankWolfe.ActiveSet([(1/n, v)])
-        x= 1/n *v
-        for i in S[2]:S[end]
-            v = zeros(m)
-            v[i] = min(ub[i], s)
-            push!(active_set, (1/n, v))
-            x += 1/n * v
-        end
-        y= FrankWolfe.compute_active_set_iterate!(active_set)
-        @assert sum(y) ≤ s
-        b = isapprox.(x,y, atol =1e-6, rtol=1e-3)
-        @assert sum(b) == m
-    end
-
-    return x, active_set, S
-end
-
 function build_start_point2(A, m, n, N, ub)
-  #println("build start point")
     # Get n linearly independent rows of A
     S = linearly_independent_rows(A,m,n)
     @assert length(S) == n
@@ -491,17 +432,11 @@ function build_start_point2(A, m, n, N, ub)
     E = []
     V = Vector{Float64}[]
 
-   # @show S
 
     while !isempty(setdiff(S, findall(x-> !(iszero(x)),x)))
         v = zeros(m)
         while sum(v) < N
-           # @show v
-           # @show sum(v)
-           # @show S
             idx = isempty(setdiff(S, findall(x-> !(iszero(x)),v))) ? rand(setdiff(collect(1:m), S)) : rand(setdiff(S, findall(x-> !(iszero(x)),v)))
-           # @show idx
-           # idx = rand(setdiff(S, findall(x-> !(iszero(x)),x)))
             if !isapprox(v[idx], 0.0)
                 @debug "Index $(idx) already picked"
                 continue
@@ -516,20 +451,9 @@ function build_start_point2(A, m, n, N, ub)
     a = length(V)
     x = sum(V .* 1/a)
     active_set= FrankWolfe.ActiveSet(fill(1/a, a), V, x)
-    #println("End build start point")
 
     return x, active_set, S
 end
-
-#function greedy_incumbent(m, s, ub, S)
- #   x = zeros(m)
- #   x[S] .= 1
- #   sum = length(S)
-  #  for i in S
-   #     x[i] = min(ub[i], s-sum)
-   # end
-   # return x
-#end
 
 """
 Create first incumbent for Boscia and custom BB in a greedy fashion.

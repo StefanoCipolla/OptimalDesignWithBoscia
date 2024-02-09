@@ -1,13 +1,9 @@
-# Optimal design with SCIP
+### Optimal design with SCIP
 function solve_opt_scip(seed, m, n, time_limit, criterion, corr; write=true, verbose=true)
     if criterion == "A"
-        A, C, N, ub =build_data(seed, m, n, false, corr)
-        f, grad! = build_a_criterion(A, false)
-       # error("SCIP OA does not work with A-opt")
+       error("SCIP OA does not work with A-opt")
     elseif criterion == "D"
-        A, C, N, ub =build_data(seed, m, n, false, corr)
-        f, grad! = build_d_criterion(A, false, C=C)
-      #  error("SCIP OA does not work with D-opt")
+        error("SCIP OA does not work with D-opt")
     elseif criterion == "AF"
         A, C, N, ub =build_data(seed, m, n, true, corr)
         f, grad! = build_a_criterion(A, true, C=C)

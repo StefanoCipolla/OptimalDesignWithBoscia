@@ -1,4 +1,4 @@
-# Solving opt design problem with Pajarito
+#### Solving opt design problem with Pajarito
 
 # Pajarito model for the D-optimal problems
 function build_D_pajarito_model(seed, m, n, criterion, time_limit, corr, verbose=true)
@@ -12,11 +12,9 @@ function build_D_pajarito_model(seed, m, n, criterion, time_limit, corr, verbose
     @assert (m > n) && (sum(ub) >= N)
 
     # setup solvers
-    # MIP solver (try SCIP as well?)
+    # MIP solver
     oa_solver = optimizer_with_attributes(HiGHS.Optimizer,
         MOI.Silent() => !verbose,
-       # "mip_feasibility_tolerance" => 1e-8,
-       # "mip_rel_gap" => 1e-6,
     )
     # SDP solver
     conic_solver = optimizer_with_attributes(Hypatia.Optimizer, 
@@ -70,7 +68,6 @@ end
 # Pajarito model for the A-optimal problems
 # As suggested here: https://github.com/jump-dev/Pajarito.jl/issues/444
 function build_A_pajarito_model(seed, m , n, criterion, time_limit, corr, verbose = true)
-    #error("Pajarito and A-opt: Needs to be fixed!!")
     if criterion == "AF"
         A, C, N, ub = build_data(seed, m, n, true, corr)
     else
@@ -80,11 +77,9 @@ function build_A_pajarito_model(seed, m , n, criterion, time_limit, corr, verbos
     @assert (m > n) && (sum(ub) >= N)
 
     # setup solvers
-    # MIP solver (try SCIP as well?)
+    # MIP solver
     oa_solver = optimizer_with_attributes(HiGHS.Optimizer,
         MOI.Silent() => !verbose,
-       # "mip_feasibility_tolerance" => 1e-8,
-       # "mip_rel_gap" => 1e-6,
     )
     # SDP solver
     conic_solver = optimizer_with_attributes(Hypatia.Optimizer, 
@@ -135,17 +130,6 @@ function build_A_pajarito_model(seed, m , n, criterion, time_limit, corr, verbos
         add_homog_spectral(MatNegSqrtConj() , n, vcat(1.0 * t, X_vec), model)
     end
 
-#=elseif criterion == "A"
-    # https://discourse.julialang.org/t/how-to-optimize-trace-of-matrix-inverse-with-jump-or-convex/94167/4
-    cone = EpiPerSepSpectralCone{Float64}(Hypatia.Cones.NegSqrtSSF(), Hypatia.Cones.MatrixCSqr{Float64, Float64}, n, true)
-    @constraint(model, vcat(1.0, t, [ sum(A[k, i] * x[k] * A[k,j] for k in 1:m) * (i == j ? 1 : sqrt(2)) for i in 1:n for j in 1:i]...) in cone)
-    @objective(model, Min, 4 * t)
-elseif criterion == "AF"
-    cone = EpiPerSepSpectralCone{Float64}(Hypatia.Cones.NegSqrtSSF(), Hypatia.Cones.MatrixCSqr{Float64, Float64}, n, true)
-    @constraint(model, vcat(1.0, t, [ (C[i,j] + sum(A[k, i] * x[k] * A[k,j] for k in 1:m)) * (i == j ? 1 : sqrt(2)) for i in 1:n for j in 1:i]...) in cone)
-    @objective(model, Min, 4 * t)
-end=#
-
     return model, x
 end
 
@@ -171,8 +155,8 @@ function solve_opt_pajarito(seed, m, n, time_limit, criterion, corr; write=true,
     y = value.(x)
     t = solve_time(model)
     paja_opt = JuMP.unsafe_backend(model)
-    numberIter = paja_opt.num_cuts
-    numberCuts = paja_opt.num_iters
+    numberIter = paja_opt.num_iters
+    numberCuts = paja_opt.num_cuts
 
     # Check feasibility
     if criterion == "A" || criterion == "D"

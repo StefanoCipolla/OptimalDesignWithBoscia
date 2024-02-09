@@ -168,7 +168,6 @@ function project_onto_feasible_region(x, node, N)
     if s_prod == 0
         return x
     end
-   # @show s_prod
     # If the difference is negative, we might crash the upper bounds. 
     # Else, we could crash the lower bounds.
     bounds = s_prod > 0 ? node.lower_bounds : node.upper_bounds

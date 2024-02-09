@@ -37,7 +37,6 @@ function enforce_epigraph(ch::GradientCutHandler, tol=1e-6)
             dot(ch.storage, ch.vars) - ch.epivar,
             MOI.LessThan(dot(ch.storage, values) - fx),
         )
-        # print(ch.o) # KeyError: key Ptr{Nothing} @0x000000001421e2b0 not found
         ch.ncalls += 1
         return SCIP.SCIP_CONSADDED
     end
