@@ -19,7 +19,7 @@ include("fusion_co-bnb.jl")
 dimensions = [20,30]
 facs = [10,4]
 time_limit = 300
-verbose = true
+verbose = false
 
 @testset "Boscia" begin
    @testset "A Optimal" begin
@@ -32,14 +32,12 @@ verbose = true
                 x_corr, _ = ODWB.solve_opt(seed, m, n, time_limit, "A", true; write = false, verbose=verbose)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, false, false)
-                o = SCIP.Optimizer()
-                check_lmo,_ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_ind)
                 @test isapprox(sum(x_ind), N; atol=1e-4, rtol=1e-2)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, false, true)
-                o = SCIP.Optimizer()
-                check_lmo,_ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_corr)
                 @test isapprox(sum(x_corr), N; atol=1e-4, rtol=1e-2)
             end
@@ -51,16 +49,14 @@ verbose = true
         for m in dimensions 
             for k in facs 
                 n = Int(floor(m/k))
-                x_ind, _ = ODWBe_opt(seed, m ,n, time_limit, "D", false; write = false, verbose=verbose)
+                x_ind, _ = ODWB.solve_opt(seed, m ,n, time_limit, "D", false; write = false, verbose=verbose)
                 x_corr, _ = ODWB.solve_opt(seed, m, n, time_limit, "D", true; write = false, verbose=verbose )
                 A, _, N, ub = ODWB.build_data(seed, m , n, false, false)
-                o = SCIP.Optimizer()
-                check_lmo,_ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_ind)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, false, true)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_corr)
                 @test isapprox(sum(x_corr), N; atol=1e-4, rtol=1e-2)
             end
@@ -76,14 +72,12 @@ verbose = true
                 x_corr, _ = ODWB.solve_opt(seed, m, n, time_limit, "AF", true; write = false, verbose=verbose)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, true, false)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_ind)
                 @test isapprox(sum(x_ind), N; atol=1e-4, rtol=1e-2)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, true, true)
-                o = SCIP.Optimizer()
-                check_lmo,_  = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_corr)
                 @test isapprox(sum(x_corr), N; atol=1e-4, rtol=1e-2)
             end
@@ -99,14 +93,12 @@ verbose = true
                 x_corr, _ = ODWB.solve_opt(seed, m, n, time_limit, "DF", true; write = false, verbose=verbose)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, true, false)
-                o = SCIP.Optimizer()
-                check_lmo,_ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_ind)
                 @test isapprox(sum(x_ind), N; atol=1e-4, rtol=1e-2)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, true, true)
-                o = SCIP.Optimizer()
-                check_lmo,_ = ODWB.build_lmo(o,m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_corr)
                 @test isapprox(sum(x_corr), N; atol=1e-4, rtol=1e-2)
             end
@@ -122,20 +114,18 @@ end
                 n = Int(floor(m/k))
                 println("\n")
                 @show m, n
-                x_ind, time_ind, _, _, _ = @timed ODWBe_opt_custom(seed, m ,n, time_limit, "A", false; write = false, verbose=verbose)
+                x_ind, time_ind, _, _, _ = @timed ODWB.solve_opt_custom(seed, m ,n, time_limit, "A", false; write = false, verbose=verbose)
                 @show time_ind
                 x_corr, time_corr, _, _, _ = @timed ODWB.solve_opt_custom(seed, m, n, time_limit, "A", true; write = false, verbose=verbose)
                 @show time_corr
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, false, false)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_ind)
                 @test isapprox(sum(x_ind), N; atol=1e-4, rtol=1e-2)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, false, true)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_corr)
                 @test isapprox(sum(x_corr), N; atol=1e-4, rtol=1e-2)
              end
@@ -150,14 +140,12 @@ end
                 x_corr, time_corr, _,_,_ = @timed ODWB.solve_opt_custom(seed, m, n, time_limit, "D", true; write = false, verbose=verbose)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, false, false)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_ind)
                 @test isapprox(sum(x_ind), N; atol=1e-4, rtol=1e-2)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, false, true)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_corr)
                 @test isapprox(sum(x_corr), N; atol=1e-4, rtol=1e-2)
             end
@@ -171,18 +159,16 @@ end
         for m in dimensions 
             for k in facs 
                 n = Int(floor(m/k))
-                x_ind = ODWB_scip(seed, m ,n, time_limit, "AF", false; write = false, verbose=verbose)
+                x_ind = ODWB.solve_opt_scip(seed, m ,n, time_limit, "AF", false; write = false, verbose=verbose)
                 x_corr = ODWB.solve_opt_scip(seed, m, n, time_limit, "AF", true; write = false, verbose=verbose)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, true, false)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_ind)
                 @test isapprox(sum(x_ind), N; atol=1e-4, rtol=1e-2)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, true, true)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_corr)
                 @test isapprox(sum(x_corr), N; atol=1e-4, rtol=1e-2)
             end
@@ -197,14 +183,12 @@ end
                 x_corr = ODWB.solve_opt_scip(seed, m, n, time_limit, "DF", true; write = false, verbose=verbose)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, true, false)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_ind)
                 @test isapprox(sum(x_ind), N; atol=1e-4, rtol=1e-2)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, true, true)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_corr)
                 @test isapprox(sum(x_corr), N; atol=1e-4, rtol=1e-2)
             end
@@ -222,14 +206,12 @@ end
                 x_corr = ODWB.solve_opt_pajarito(seed, m, n, time_limit, "A", true; write = false, verbose=verbose)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, false, false)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_ind)
                 @test isapprox(sum(x_ind), N; atol=1e-4, rtol=1e-2)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, false, true)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_corr)
                 @test isapprox(sum(x_corr), N; atol=1e-4, rtol=1e-2)
             end
@@ -244,14 +226,12 @@ end
                 x_corr = ODWB.solve_opt_pajarito(seed, m, n, time_limit, "D", true; write = false, verbose=verbose)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, false, false)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_ind)
                 @test isapprox(sum(x_ind), N; atol=1e-4, rtol=1e-2)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, false, true)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_corr)
                 @test isapprox(sum(x_corr), N; atol=1e-4, rtol=1e-2)
             end
@@ -266,14 +246,12 @@ end
                 x_corr = ODWB.solve_opt_pajarito(seed, m, n, time_limit, "AF", true; write = false, verbose=verbose)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, true, false)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_ind)
                 @test isapprox(sum(x_ind), N; atol=1e-4, rtol=1e-2)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, true, true)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_corr)
                 @test isapprox(sum(x_corr), N; atol=1e-4, rtol=1e-2)
             end
@@ -288,14 +266,12 @@ end
                 x_corr = ODWB.solve_opt_pajarito(seed, m, n, time_limit, "DF", true; write = false, verbose=verbose)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, true, false)
-                o = SCIP.Optimizer()
-                check_lmo,_ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_ind)
                 @test isapprox(sum(x_ind), N; atol=1e-4, rtol=1e-2)
 
                 A, _, N, ub = ODWB.build_data(seed, m , n, true, true)
-                o = SCIP.Optimizer()
-                check_lmo, _ = ODWB.build_lmo(o, m, N, ub)
+                check_lmo = ODWB.build_blmo(m, N, ub)
                 @test Boscia.is_linear_feasible(check_lmo, x_corr)
                 @test isapprox(sum(x_corr), N; atol=1e-4, rtol=1e-2)
             end
