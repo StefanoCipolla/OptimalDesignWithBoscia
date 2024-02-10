@@ -34,7 +34,7 @@ function solve_opt_scip(seed, m, n, time_limit, criterion, corr; write=true, ver
 
     if write 
         df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N,time=time_scip, solution=solution_scip, dual=dual_objective, termination=termination_scip, calls=ncalls_scip)
-        file_name = "/scratch/opt/dhendryc/MasterThesis/ODWBscip_" * criterion * "_" * string(m) * "_" * type * "_optimality" * ".csv"
+        file_name = joinpath(@__DIR__, "../csv/SCIP/scip_" * criterion * "_" * string(m) * "_" * type * "_optimality" * ".csv")
         if !isfile(file_name)
             CSV.write(file_name, df, append=true, writeheader=true)
         else 

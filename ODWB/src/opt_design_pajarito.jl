@@ -187,7 +187,7 @@ function solve_opt_pajarito(seed, m, n, time_limit, criterion, corr; write=true,
 
     if write 
         df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, time=t, N=N, solution=solution, termination=status, numberIterations=numberIter, numberCuts=numberCuts)
-        file_name = "/scratch/opt/dhendryc/MasterThesis/optDesign/csv/Pajarito/pajarito_" * criterion * "_" * string(m) * "_" * type * "_optimality.csv"
+        file_name = joinpath(@__DIR__, "../csv/Pajarito/pajarito_" * criterion * "_" * string(m) * "_" * type * "_optimality.csv")
         if !isfile(file_name)
             CSV.write(file_name, df, append=true, writeheader=true)
         else 

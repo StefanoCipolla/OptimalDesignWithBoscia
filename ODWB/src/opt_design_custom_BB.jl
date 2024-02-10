@@ -1,5 +1,8 @@
 """
     Custom Branch-and-Bound for the Exact Optimal Design Problem
+
+From "A Branch-and-Bound Algorithm for the Exact Optimal Experimental Design Problem" 
+by Selin Damla Ahipasaoglu
 """
 
 """
@@ -339,7 +342,7 @@ function solve_opt_custom(seed, m, n, time_limit, criterion, corr; write = true,
         time_per_nodes = time/tree.num_nodes
         type = corr ? "correlated" : "independent"
         df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=time, time_per_nodes=time_per_nodes, solution=solution, solution_scaled=solution_scaled, number_nodes=tree.num_nodes, termination=status)
-        file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/CustomBB/customBB_" * criterion * "_" * string(m) * "_" * type * "_optimality.csv"
+        file_name = joinpath(@__DIR__, "../csv/CustomBB/customBB_" * criterion * "_" * string(m) * "_" * type * "_optimality.csv")
         if !isfile(file_name)
             CSV.write(file_name, df, append=true, writeheader=true)
         else 
