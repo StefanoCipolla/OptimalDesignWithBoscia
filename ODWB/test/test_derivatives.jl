@@ -29,8 +29,8 @@ end
         n = Int(floor(dim/4))
         @show dim, n
         gradient = rand(dim)
-        A, _, _, _ = optDesign.build_data(seed,dim, n, false, false)
-        f, grad! = optDesign.build_a_criterion(A, false, μ=1e-2)
+        A, _, _, _ = ODWB.build_data(seed,dim, n, false, false)
+        f, grad! = ODWB.build_a_criterion(A, false, μ=1e-2)
 
         @test check_gradients(grad!, f, gradient)
     end
@@ -41,8 +41,8 @@ end
         n = Int(floor(dim/4))
         @show dim, n
         gradient = rand(dim)
-        A, _, _, _ = optDesign.build_data(seed,dim, n, false, false)
-        f, grad! = optDesign.build_d_criterion(A, false)
+        A, _, _, _ = ODWB.build_data(seed,dim, n, false, false)
+        f, grad! = ODWB.build_d_criterion(A, false)
 
         @test check_gradients(grad!, f, gradient)
     end
@@ -53,8 +53,8 @@ end
         n = Int(floor(dim/4))
         @show dim, n
         gradient = rand(dim)
-        A, C, _, _ = optDesign.build_data(seed,dim, n, true, false)
-        f, grad! = optDesign.build_a_criterion(A, true, C=C)
+        A, C, _, _ = ODWB.build_data(seed,dim, n, true, false)
+        f, grad! = ODWB.build_a_criterion(A, true, C=C)
 
         @test check_gradients(grad!, f, gradient)
     end
@@ -65,8 +65,8 @@ end
         n = Int(floor(dim/4))
         @show dim, n
         gradient = rand(dim)
-        A, C, _, _ = optDesign.build_data(seed,dim, n, true, false)
-        f, grad! = optDesign.build_d_criterion(A,true, C=C)
+        A, C, _, _ = ODWB.build_data(seed,dim, n, true, false)
+        f, grad! = ODWB.build_d_criterion(A,true, C=C)
 
         @test check_gradients(grad!, f, gradient)
     end
@@ -79,8 +79,8 @@ end
             n = Int(floor(dim/4))
             @show dim, n
             gradient = rand(dim)
-            A, _, _, _ = optDesign.build_data(seed,dim, n, true, false)
-            f, grad! = optDesign.build_matrix_means_objective(A,p)
+            A, _, _, _ = ODWB.build_data(seed,dim, n, true, false)
+            f, grad! = ODWB.build_matrix_means_objective(A,p)
 
             @test check_gradients(grad!, f, gradient)
         end

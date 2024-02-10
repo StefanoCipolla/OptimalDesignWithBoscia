@@ -2,7 +2,7 @@ using LinearAlgebra
 using Plots
 #using PyPlot
 using Random
-using optDesign
+using ODWB
 seed = 30
 pyplot()
 
@@ -31,7 +31,7 @@ for fusion in [true, false]
     for corr in [true, false]
         Random.seed!(seed)
         #A = randn(10,2)
-        A, _, _, _ = optDesign.build_data(seed, 10, 2, fusion, corr)
+        A, _, _, _ = ODWB.build_data(seed, 10, 2, fusion, corr)
         type = corr ? "CORR" : "IND"
         problem = fusion ? "F" : "O"
 

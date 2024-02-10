@@ -17,7 +17,7 @@ for m in dimensions #[20,30,50,60,80,100,
     for k in fracs
         n = Int(floor(m/k))
         for seed in 1:5
-            A, _, N, _ = optDesign.build_data(seed, m, n, false, false)
+            A, _, N, _ = ODWB.build_data(seed, m, n, false, false)
             eigs = eigvals(A'*A)
             maxeig= maximum(eigs)
             mineig = minimum(eigs)
@@ -29,7 +29,7 @@ for m in dimensions #[20,30,50,60,80,100,
                 CSV.write(file_name, df, append=true, delim=";")
             end
 
-            A, _, N, _ = optDesign.build_data(seed, m, n, false, true)
+            A, _, N, _ = ODWB.build_data(seed, m, n, false, true)
             eigs = eigvals(A'*A)
             maxeig= maximum(eigs)
             mineig = minimum(eigs)
@@ -41,7 +41,7 @@ for m in dimensions #[20,30,50,60,80,100,
                 CSV.write(file_name, df, append=true, delim=";")
             end
 
-            A, _, N, _ = optDesign.build_data(seed, m, n, true, false)
+            A, _, N, _ = ODWB.build_data(seed, m, n, true, false)
             eigs = eigvals(A'*A)
             maxeig= maximum(eigs)
             mineig = minimum(eigs)
@@ -53,7 +53,7 @@ for m in dimensions #[20,30,50,60,80,100,
                 CSV.write(file_name, df, append=true, delim=";")
             end
 
-            A, _, N, _ = optDesign.build_data(seed, m, n, true, true)
+            A, _, N, _ = ODWB.build_data(seed, m, n, true, true)
             eigs = eigvals(A'*A)
             maxeig= maximum(eigs)
             mineig = minimum(eigs)

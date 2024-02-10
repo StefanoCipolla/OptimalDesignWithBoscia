@@ -25,13 +25,13 @@ verbose = false
         for k in facs 
             n = Int(floor(m/k))
             # independent data
-            x_b_ind, _ = optDesign.solve_opt(seed, m ,n, time_limit, "AF", false; write = false, verbose=verbose)
-            x_co_ind = optDesign.solve_opt_custom(seed, m, n, time_limit, "AF", false; write=false, verbose=verbose)
+            x_b_ind, _ = ODWB.solve_opt(seed, m ,n, time_limit, "AF", false; write = false, verbose=verbose)
+            x_co_ind = ODWB.solve_opt_custom(seed, m, n, time_limit, "AF", false; write=false, verbose=verbose)
 
             # Testing
-            A, C, N, ub = optDesign.build_data(seed, m , n, true, false)
-            check_lmo = optDesign.build_blmo(m, N, ub)
-            f, _ = optDesign.build_a_criterion(A, true, C=C)
+            A, C, N, ub = ODWB.build_data(seed, m , n, true, false)
+            check_lmo = ODWB.build_blmo(m, N, ub)
+            f, _ = ODWB.build_a_criterion(A, true, C=C)
 
             @show f(x_b_ind)
             @show f(x_co_ind)
@@ -47,13 +47,13 @@ end
         for k in facs 
             n = Int(floor(m/k))
             # independent data
-            x_b_ind, _ = optDesign.solve_opt(seed, m ,n, time_limit, "DF", false; write = false, verbose=verbose)
-            x_co_ind = optDesign.solve_opt_custom(seed, m, n, time_limit, "DF", false; write=false, verbose=verbose)
+            x_b_ind, _ = ODWB.solve_opt(seed, m ,n, time_limit, "DF", false; write = false, verbose=verbose)
+            x_co_ind = ODWB.solve_opt_custom(seed, m, n, time_limit, "DF", false; write=false, verbose=verbose)
 
             # Testing
-            A, C, N, ub = optDesign.build_data(seed, m , n, true, false)
-            check_lmo = optDesign.build_blmo(m, N, ub)
-            f, _ = optDesign.build_d_criterion(A, true, C=C)
+            A, C, N, ub = ODWB.build_data(seed, m , n, true, false)
+            check_lmo = ODWB.build_blmo(m, N, ub)
+            f, _ = ODWB.build_d_criterion(A, true, C=C)
 
             @show f(x_b_ind)
             @show f(x_co_ind)
@@ -69,13 +69,13 @@ end
         for k in facs 
             n = Int(floor(m/k))
         
-            x_b_corr, _ = optDesign.solve_opt(seed, m, n, time_limit, "AF", true; write = false, verbose=verbose)
-            x_co_corr = optDesign.solve_opt_custom(seed, m, n, time_limit, "AF", true; write=false, verbose=verbose)
+            x_b_corr, _ = ODWB.solve_opt(seed, m, n, time_limit, "AF", true; write = false, verbose=verbose)
+            x_co_corr = ODWB.solve_opt_custom(seed, m, n, time_limit, "AF", true; write=false, verbose=verbose)
 
             # Testing
-            A, C, N, ub = optDesign.build_data(seed, m , n, true, true)
-            check_lmo = optDesign.build_blmo(m, N, ub)
-            f, _ = optDesign.build_a_criterion(A, true, C=C)
+            A, C, N, ub = ODWB.build_data(seed, m , n, true, true)
+            check_lmo = ODWB.build_blmo(m, N, ub)
+            f, _ = ODWB.build_a_criterion(A, true, C=C)
 
             @show f(x_b_corr)
             @show f(x_co_corr)
@@ -91,13 +91,13 @@ end
         for k in facs 
             n = Int(floor(m/k))
             
-            x_b_corr, _ = optDesign.solve_opt(seed, m, n, time_limit, "DF", true; write = false, verbose=verbose)
-            x_co_corr = optDesign.solve_opt_custom(seed, m, n, time_limit, "DF", true; write=false, verbose=verbose)
+            x_b_corr, _ = ODWB.solve_opt(seed, m, n, time_limit, "DF", true; write = false, verbose=verbose)
+            x_co_corr = ODWB.solve_opt_custom(seed, m, n, time_limit, "DF", true; write=false, verbose=verbose)
 
             # Testing
-            A, C, N, ub = optDesign.build_data(seed, m , n, true, true)
-            check_lmo = optDesign.build_blmo(m, N, ub)
-            f, _ = optDesign.build_d_criterion(A, true, C=C)
+            A, C, N, ub = ODWB.build_data(seed, m , n, true, true)
+            check_lmo = ODWB.build_blmo(m, N, ub)
+            f, _ = ODWB.build_d_criterion(A, true, C=C)
 
             @show f(x_b_corr)
             @show f(x_co_corr)
