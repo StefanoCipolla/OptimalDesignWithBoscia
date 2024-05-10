@@ -1,14 +1,13 @@
-### Optimal design with SCIP
-function solve_opt_scip(seed, m, n, time_limit, criterion, corr; write=true, verbose=true)
-    if criterion == "A"
-       error("SCIP OA does not work with A-opt")
-    elseif criterion == "D"
-        error("SCIP OA does not work with D-opt")
+# Optimal design with SCIP
+function solve_opt_scip(seed, m, n, time_limit, criterion, corr; p=0, write=true, verbose=true, long_run=false, specific_seed = false)
+    if criterion in ["A","D"]
+       error("SCIP OA only works with the Fusion Problems")
     elseif criterion == "AF"
-        A, C, N, ub =build_data(seed, m, n, true, corr)
+        A, C, N, ub, _ = build_data(seed, m, n, true, corr)
         f, grad! = build_a_criterion(A, true, C=C)
+        #f, grad! = build_general_trace(A, -1, true, C=C) # Log(Tr(X^{-1}))
     elseif criterion == "DF"
-        A, C, N, ub =build_data(seed, m, n, true, corr)
+        A, C, N, ub, _ = build_data(seed, m, n, true, corr)
         f, grad! = build_d_criterion(A, true, C=C)
     else
         error("Invalid criterion!")
@@ -34,7 +33,13 @@ function solve_opt_scip(seed, m, n, time_limit, criterion, corr; write=true, ver
 
     if write 
         df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N,time=time_scip, solution=solution_scip, dual=dual_objective, termination=termination_scip, calls=ncalls_scip)
-        file_name = joinpath(@__DIR__, "../csv/SCIP/scip_" * criterion * "_" * string(m) * "_" * type * "_optimality" * ".csv")
+        if long_run
+            file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/SCIP/long_run/scip_" * criterion * "_" * string(m) * "_" * type * "_optimality" * ".csv"
+        elseif specific_seed
+            file_name = file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/SCIP/scip_" * criterion * "_" * string(m) * "_" * string(n) * "_" * type * "_optimality_" * string(seed) * ".csv"
+        else
+            file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/SCIP/scip_" * criterion * "_" * string(m) * "_" * type * "_optimality_" * ".csv"
+        end
         if !isfile(file_name)
             CSV.write(file_name, df, append=true, writeheader=true)
         else 
@@ -62,8 +67,3 @@ function build_scip_optimizer(m, N, ub, limit, f, grad!, verbose)
     
     return lmo, epigraph_ch, x, lmo_check
 end
-
-
-
-  
-
