@@ -6,6 +6,10 @@ using Random
 using ODWB
 using Test
 
+seed = rand(UInt64)
+@show seed
+Random.seed!(seed)
+
 """
 Check if the gradient using finite differences matches the grad! provided.
 Copied from FrankWolfe package: https://github.com/ZIB-IOL/FrankWolfe.jl/blob/master/examples/plot_utils.jl
@@ -29,7 +33,7 @@ end
         n = Int(floor(dim/4))
         @show dim, n
         gradient = rand(dim)
-        A, _, _, _ = ODWB.build_data(seed,dim, n, false, false)
+        A, _, _, _, _ = ODWB.build_data(seed,dim, n, false, false)
         f, grad! = ODWB.build_a_criterion(A, false, μ=1e-2)
 
         @test check_gradients(grad!, f, gradient)
@@ -41,8 +45,8 @@ end
         n = Int(floor(dim/4))
         @show dim, n
         gradient = rand(dim)
-        A, _, _, _ = ODWB.build_data(seed,dim, n, false, false)
-        f, grad! = ODWB.build_d_criterion(A, false)
+        A, _, _, _, _ = ODWB.build_data(seed,dim, n, false, false)
+        f, grad! = ODWB.build_d_criterion(A, false, build_safe=true)
 
         @test check_gradients(grad!, f, gradient)
     end
@@ -53,7 +57,7 @@ end
         n = Int(floor(dim/4))
         @show dim, n
         gradient = rand(dim)
-        A, C, _, _ = ODWB.build_data(seed,dim, n, true, false)
+        A, C, _, _, _ = ODWB.build_data(seed,dim, n, true, false)
         f, grad! = ODWB.build_a_criterion(A, true, C=C)
 
         @test check_gradients(grad!, f, gradient)
@@ -65,7 +69,7 @@ end
         n = Int(floor(dim/4))
         @show dim, n
         gradient = rand(dim)
-        A, C, _, _ = ODWB.build_data(seed,dim, n, true, false)
+        A, C, _, _, _ = ODWB.build_data(seed,dim, n, true, false)
         f, grad! = ODWB.build_d_criterion(A,true, C=C)
 
         @test check_gradients(grad!, f, gradient)
@@ -79,7 +83,12 @@ end
             n = Int(floor(dim/4))
             @show dim, n
             gradient = rand(dim)
-            A, _, _, _ = ODWB.build_data(seed,dim, n, true, false)
+            A, _, _, _, _ = ODWB.build_data(seed,dim, n, true, false)
+            f, grad! = ODWB.build_matrix_means_objective(A,p)
+
+            @test check_gradients(grad!, f, gradient)
+
+            A, _, _, _, _ = ODWB.build_data(seed,dim, n, false, false)
             f, grad! = ODWB.build_matrix_means_objective(A,p)
 
             @test check_gradients(grad!, f, gradient)
