@@ -1,8 +1,5 @@
 """
     Custom Branch-and-Bound for the Exact Optimal Design Problem
-
-From "A Branch-and-Bound Algorithm for the Exact Optimal Experimental Design Problem" 
-by Selin Damla Ahipasaoglu
 """
 
 """
@@ -13,6 +10,7 @@ mutable struct CustomBBNode <: Bonobo.AbstractNode
     lower_bounds::Vector{Float64}
     upper_bounds::Vector{Float64}
     solution::Vector{Float64}
+    w::Vector{Float64}
     time::Float64
     iteration_count::Int64
 end
@@ -45,32 +43,40 @@ Create the information for the childern nodes.
 """
 function Bonobo.get_branching_nodes_info(tree::Bonobo.BnBTree{<:CustomBBNode}, node, vidx)
     x = Bonobo.get_relaxed_values(tree, node)
-    @assert node.lower_bounds[vidx] < node.upper_bounds[vidx]
+    w = node.w
+    N = tree.root.N
+    @assert node.lower_bounds[vidx] < node.upper_bounds[vidx] "Branching lb: $(node.lower_bounds[vidx]) ub: $(node.upper_bounds[vidx]) x[vidx]=$(x[vidx])"
     frac_val = x[vidx]
 
     # Left child keeps the lower bounds and gets a new upper bound at vidx.
     left_bounds = copy(node.upper_bounds)
-    left_bounds[vidx] = floor(frac_val)
+    left_bounds[vidx] = floor(frac_val)/N
     left_solution = copy(node.solution)
     left_solution[vidx] = floor(frac_val)
+    left_w = copy(node.w)
+    left_w[vidx] = floor(frac_val)/N
 
 
     node_info_left = (lower_bounds=node.lower_bounds, 
                     upper_bounds = left_bounds,
                     solution = left_solution,
+                    w = left_w,
                     time = 0.0,
                     iteration_count = 0
     )
 
     # Right child keeps the upper bounds and gets a new lower bound at vidx.
     right_bounds = copy(node.lower_bounds)
-    right_bounds[vidx] = ceil(frac_val)
+    right_bounds[vidx] = ceil(frac_val)/N
     right_solution = copy(node.solution)
     right_solution[vidx] = ceil(frac_val)
+    right_w = copy(node.w)
+    right_w[vidx] = ceil(frac_val)/N
 
     node_info_right = (lower_bounds=right_bounds, 
                     upper_bounds = node.upper_bounds,
                     solution = right_solution,
+                    w = right_w,
                     time = 0.0,
                     iteration_count = 0
     )
@@ -87,35 +93,35 @@ function Bonobo.evaluate_node!(tree, node)
     iter_count = 0
 
     # get feasible start point
-    x = copy(node.solution)
-    x = project_onto_feasible_region(x, node, tree.root.N)
+    N = tree.root.N
+    w = copy(node.w)
+    w = alternating_projection(w, node, 1)
 
     # If the node is not reachable, i.e. we can never satisfy the knapsack add_constraint
-    if x === nothing
+    if w === nothing
         return NaN, NaN
     end
+    x = N*w
 
-    @assert check_feasibilty(x, node, tree)
+    gradient = similar(w)
+    tree.root.grad(gradient, w)
+    linesearch_workspace = FrankWolfe.build_linesearch_workspace(FrankWolfe.Adaptive(), w, gradient)
 
-    gradient = similar(x)
-    tree.root.grad(gradient, x)
-    linesearch_workspace = FrankWolfe.build_linesearch_workspace(FrankWolfe.Adaptive(), x, gradient)
+    jdx = find_max_gradient(w, -gradient, node.upper_bounds, tree.root)
+    kdx = find_min_gradient(w, -gradient, node.lower_bounds, tree.root)
 
-    jdx = find_max_gradient(x, -gradient, node.upper_bounds)
-    kdx = find_min_gradient(x, -gradient, node.lower_bounds)
-
-    while gradient[jdx]/gradient[kdx] - 1 > 1e-5 && iter_count < 10000
+    while gradient[jdx]/gradient[kdx] - 1 > 1e-6 && iter_count < 10000
         # find theta
-        d = zeros(length(x))
+        d = zeros(length(w))
         d[jdx] = 1.0
         d[kdx] = -1.0
-        theta_max = min(node.upper_bounds[jdx] - x[jdx], x[kdx] - node.lower_bounds[kdx])
+        theta_max = min(node.upper_bounds[jdx] - w[jdx], w[kdx] - node.lower_bounds[kdx])
         theta =  tree.root.linesearch(
             node,
             tree.root.f,
             tree.root.grad,
             gradient, 
-            x,
+            w,
             d,
             theta_max,
             linesearch_workspace,
@@ -125,33 +131,35 @@ function Bonobo.evaluate_node!(tree, node)
         )
 
         # weight shift
-        x[jdx] += theta
-        x[kdx] -= theta
+        w[jdx] += theta
+        w[kdx] -= theta
 
         # compute the new jdx and kdx
-        tree.root.grad(gradient, x)
-        jdx = find_max_gradient(x, -gradient, node.upper_bounds)
-        kdx = find_min_gradient(x, -gradient, node.lower_bounds)
+        tree.root.grad(gradient, w)
+        jdx = find_max_gradient(w, -gradient, node.upper_bounds, tree.root)
+        kdx = find_min_gradient(w, -gradient, node.lower_bounds, tree.root)
         iter_count += 1
 
-        if !check_feasibilty(x, node, tree)
-            @show node.upper_bounds - x
-            @show x - node.lower_bounds
-            @show sum(x)
+        if !check_feasibilty(w, node)
+            @show node.upper_bounds - w
+            @show w - node.lower_bounds
+            @show sum(w)
         end
-        @assert check_feasibilty(x, node, tree)
+        @assert check_feasibilty(w, node)
     end
 
     time = float(Dates.value(Dates.now() - time_ref))
     node.time = time
     node.iteration_count = iter_count
 
-    obj_value = tree.root.f(x)
+    x = N*w
+    node.w = w
     node.solution = x
+    obj_value = tree.root.f(x)
 
 
-    if isapprox(sum(isapprox.(x, round.(x); atol=1e-6, rtol=5e-2)), tree.root.nvars)  && check_feasibilty(round.(x), node, tree)
-        #println("Integer solution found.")
+    if isapprox(sum(isapprox.(x, round.(x); atol=1e-6, rtol=5e-2)), tree.root.nvars)  && check_feasibilty(round.(x),node.lower_bounds*N, node.upper_bounds*N, N)
+        println("Integer solution found.")
         node.solution = round.(x)
         primal = tree.root.f(node.solution)
         return obj_value, primal
@@ -161,34 +169,31 @@ function Bonobo.evaluate_node!(tree, node)
 end
 
 """
-Project point on the feasible region which is the intersection of the hyperbox
-and the probability simplex scaled by integer N.
-"""
-function project_onto_feasible_region(x, node, N)
-    # the difference in weight you need to distribute
-    s_prod = sum(x) - N
-    # we are already on the probability simplex
-    if s_prod == 0
-        return x
-    end
-    # If the difference is negative, we might crash the upper bounds. 
-    # Else, we could crash the lower bounds.
-    bounds = s_prod > 0 ? node.lower_bounds : node.upper_bounds
-    b = (x - s_prod*ones(length(x))-bounds)*sign(s_prod)
-    set = findall(x -> x > 0, b)
+    Alternating projection
 
-    # If the set is empty, we reached an infeasible node!
-    if isempty(set)
+See: https://en.wikipedia.org/wiki/Projections_onto_convex_sets
+"""
+function alternating_projection(x, node, N)
+    if sum(node.lower_bounds) > N || sum(node.upper_bounds) < N || !all(node.lower_bounds <= node.upper_bounds)
         return nothing
     end
 
-    dir = zeros(length(x))
-    dir[set] .= 1
-    x = x - s_prod/sum(dir) * dir
+    function project_onto_cube(x, lb, ub)
+        return clamp.(x, lb, ub)
+    end
+    function project_on_prob_simplex(x, N)
+        n = length(x)
+        return x - (sum(x)-N)/n * ones(n)
+    end
 
-    @assert isapprox(sum(x), N; atol=1e-4, rtol=1e-2)
-    @assert sum(node.upper_bounds - x .>= 0) == length(x)
-    @assert sum(x- node.lower_bounds .>= 0) == length(x)
+    iter = 0
+
+    while !check_feasibilty(x, node.lower_bounds, node.upper_bounds, N) && iter < 100000
+        x = project_onto_cube(x, node.lower_bounds, node.upper_bounds)
+        x = project_on_prob_simplex(x, N) 
+        iter += 1
+    end
+    @debug "Number of iteration in the alternating projection: $(iter)"
 
     return x
 end
@@ -196,29 +201,22 @@ end
 """
 Check feasibility of a given point.
 """
-function check_feasibilty(x, lb, ub, N)
+function check_feasibilty(x, lb, ub, N; tol=0.0)
     m = length(x)
+    if all(x.>=lb .- tol) && all(x.<=ub .+ tol) && isapprox(sum(x), N) 
+        return true
+    else
+        @debug "Sum of w $(sum(x))"
+        @debug "Lower bounds: $(lb)"
+        @debug "Iterate: $(x)"
+        @debug "Upper bounds: $(ub)"
+        @debug "Difference iterate and lower bounds: $(x-lb)"
+        @debug "Difference iterate and upper bounds: $(ub-x)"
+        return false
+    end
     return sum(x.>=lb) == m && sum(x.<=ub) == m && isapprox(sum(x), N) 
 end
-check_feasibilty(x, node, tree) = check_feasibilty(x, node.lower_bounds, node.upper_bounds, tree.root.N)
-
-"""
-Find maximum gradient entry where the upper bound has yet been met.
-"""
-function find_max_gradient(x, gradient, ub)
-    bool_vec = x .< ub
-    idx_set = findall(x -> x == 1, bool_vec) 
-    return findfirst(x -> x == maximum(gradient[idx_set]), gradient)
-end
-
-"""
-Find minimum gradient entry where the lower bound has yet been met.
-"""
-function find_min_gradient(x, gradient, lb)
-    bool_vec = x .> lb
-    idx_set = findall(x -> x == 1, bool_vec) 
-    return findfirst(x -> x == minimum(gradient[idx_set]), gradient)
-end
+check_feasibilty(x, node; N=1, tol=1e-9) = check_feasibilty(x, node.lower_bounds, node.upper_bounds, N, tol=tol)
 
 """
 Returns the list of indices corresponding to the integral variables.
@@ -227,37 +225,65 @@ function Bonobo.get_branching_indices(root::ConstrainedBoxMIProblem)
     return root.integer_vars
 end
 
+"""
+Find maximum gradient entry where the upper bound has yet been met.
+"""
+function find_max_gradient(x, gradient, ub, root; tol=0.0)
+    int_var = Bonobo.get_branching_indices(root)
+    bool_vec = x[int_var] .< ub[int_var] .+ tol
+    idx_set = findall(x -> x == 1, bool_vec) 
+    return findfirst(x -> x == maximum(gradient[idx_set]), gradient)
+end
+
+"""
+Find minimum gradient entry where the lower bound has yet been met.
+"""
+function find_min_gradient(x, gradient, lb, root; tol=0.0)
+    int_var = Bonobo.get_branching_indices(root)
+    bool_vec = x[int_var] .> lb[int_var] .- tol
+    idx_set = findall(x -> x == 1, bool_vec) 
+    return findfirst(x -> x == minimum(gradient[idx_set]), gradient)
+end
 
 """
 Set up the problem and solve it with the custom BB algorithm.
 """
-function solve_opt_custom(seed, m, n, time_limit, criterion, corr; write = true, verbose= true)
+function solve_opt_custom(seed, m, n, time_limit, criterion, corr; p=0, write = true, verbose= true, long_run=false, print_iter=100, specific_seed=false)
     # build data
-    A, C, N, ub = build_data(seed, m, n, criterion in ["AF","DF"], corr)
+    A, C, N, ub, C_hat = build_data(seed, m, n, criterion in ["AF","DF", "GTIF"], corr, scaling_C=long_run)
     # build function
-    p = 1
     if criterion == "A" || criterion == "AF"
         p = -1
     elseif criterion == "D" || criterion == "DF"
         p = 0
     end
     @assert p <= 0
-    if criterion in ["A","D"]
-        C = nothing
+    if criterion in ["A","D","GTI"]
+        C_hat = nothing
     end
-    f, grad!, linesearch = build_matrix_means_objective(A, p,C=C)
+    build_safe = criterion in ["A","D","GTI"]
+    f, grad!, linesearch = build_matrix_means_objective(A, p, C_hat=C_hat, build_safe = build_safe)
 
     # create problem and tree
-    if criterion in ["A","D"]
+    if criterion in ["A","D", "GTI"]
         x0 = greedy_incumbent(A, m, n, N, ub)
+        m_hat = m
+        ub_hat = ub
+        N_hat = N
+        lb_hat = zeros(m)
     else
-        x0= greedy_incumbent_fusion(A,m,n,N,ub)
+        x0 = vcat(greedy_incumbent_fusion(A,m,n,N,ub), fill(1, 2n))
+        m_hat = m + 2n
+        ub_hat = vcat(ub, ones(2n))
+        N_hat = N + 2n
+        lb_hat = vcat(zeros(m), ones(2n)) 
     end
-    root = ConstrainedBoxMIProblem(f, grad!, linesearch, m, collect(1:m), N, time_limit)
+    root = ConstrainedBoxMIProblem(f, grad!, linesearch, m_hat, collect(1:m), N_hat, time_limit)
     nodeExample = CustomBBNode(
         Bonobo.BnBNodeInfo(1, 0.0, 0.0),
-        zeros(m),
-        ub, 
+        lb_hat,
+        ub_hat, 
+        fill(-1.0, length(x0)),
         fill(-1.0, length(x0)),
         0.0,
         0
@@ -267,6 +293,7 @@ function solve_opt_custom(seed, m, n, time_limit, criterion, corr; write = true,
     Value = Vector{Float64}
     tree = Bonobo.initialize(;
         traverse_strategy = Bonobo.BFS(),
+        branch_strategy = Bonobo.MOST_INFEASIBLE(),
         Node = Node,
         Solution = Bonobo.DefaultSolution{Node, Value},
         root = root,
@@ -274,15 +301,16 @@ function solve_opt_custom(seed, m, n, time_limit, criterion, corr; write = true,
     )
 
     Bonobo.set_root!(tree, (
-        lower_bounds = zeros(length(x0)),
-        upper_bounds = ub,
+        lower_bounds = lb_hat/N_hat,
+        upper_bounds = ub_hat/N_hat,
         solution = x0,
+        w = x0/N_hat,
         time=0.0,
         iteration_count=0
     ))
 
     time_ref = Dates.now()
-    callback = build_callback(tree, time_ref, verbose)
+    callback = build_callback(tree, time_ref, verbose, print_iter)
 
     # dummy solution - In case the process stops because of the time limit and no solution as been found yet.
     dummy_solution = Bonobo.DefaultSolution(Inf, fill(-1.0, length(x0)), nodeExample)
@@ -306,43 +334,56 @@ function solve_opt_custom(seed, m, n, time_limit, criterion, corr; write = true,
     if tree.root.Stage == Boscia.OPT_TREE_EMPTY
         @assert sum(sol_x .!= dummy_solution.solution) == length(sol_x)
     end
-    @show sol_x
+    @show sol_x[1:m]
     solution = f(sol_x)
     @show solution
+    @show tree.num_nodes
 
     # check feasibility
-    feasible = isfeasible(seed, m, n, criterion, sol_x, corr, N=N)
+    feasible = isfeasible(seed, m, n, criterion, sol_x[1:m], corr, N=N)
     if !feasible
-        @show m, sum(ub - sol_x .>= 0)
-        @show m, sum(sol_x .>= 0)
-        @show N, sum(sol_x)
+        @show m, sum(ub - sol_x[1:m] .>= 0)
+        @show m, sum(sol_x[1:m] .>= 0)
+        @show N, sum(sol_x[1:m])
     end
     @assert feasible
 
     # Calculate objective with respect to the criteria used in Boscia
     if criterion in ["A","AF"]
-        f_check, _ = build_a_criterion(A, criterion == "AF", C=C)
+        f_check, _ = build_a_criterion(A, criterion == "AF", C=C, build_safe = criterion=="A")
     else
-        f_check, _ = build_d_criterion(A, criterion == "DF", C=C)
+        f_check, _ = build_d_criterion(A, criterion == "DF", C=C, build_safe = criterion=="D")
     end
-    solution_scaled = f_check(sol_x)
-    #solution_scaled = criterion == "A" ? exp(solution) : solution - n*log(n)
+    solution_scaled = f_check(sol_x[1:m])
     @show solution_scaled
 
     # Check the solving stage
     @assert tree.root.Stage != Boscia.SOLVING
+    @show tree.root.Stage
     status = if tree.root.Stage in [Boscia.OPT_GAP_REACHED, Boscia.OPT_TREE_EMPTY]
         "optimal"
     else
-        "Time limit reached"
+        "TIME_LIMIT"
     end
 
+    dual_gap = tree.incumbent - tree.lb
+    @show dual_gap
+
     if write 
+        if criterion in ["GTI","GTIF"]
+            criterion = criterion * "_" * string(Int64(p*100))
+        end
         # write data into file
         time_per_nodes = time/tree.num_nodes
         type = corr ? "correlated" : "independent"
-        df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=time, time_per_nodes=time_per_nodes, solution=solution, solution_scaled=solution_scaled, number_nodes=tree.num_nodes, termination=status)
-        file_name = joinpath(@__DIR__, "../csv/CustomBB/customBB_" * criterion * "_" * string(m) * "_" * type * "_optimality.csv")
+        df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=time, time_per_nodes=time_per_nodes, solution=solution, solution_scaled=solution_scaled, dual_gap=dual_gap, number_nodes=tree.num_nodes, termination=status)
+        if long_run
+            file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/CustomBB/long_runs/custombb_" * criterion * "_" * string(m) * "_" * type * "_optimality.csv"
+        elseif specific_seed
+            file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/CustomBB/custombb_" * criterion * "_" * string(m) * "_" * string(n) * "_" * type * "_" * string(seed) * "_optimality.csv"
+        else
+            file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/CustomBB/custombb_" * criterion * "_" * string(m) * "_" * type * "_optimality.csv"
+        end
         if !isfile(file_name)
             CSV.write(file_name, df, append=true, writeheader=true)
         else 
@@ -352,24 +393,28 @@ function solve_opt_custom(seed, m, n, time_limit, criterion, corr; write = true,
     return sol_x
 end
 
-function build_callback(tree, time_ref, verbose)
+function build_callback(tree, time_ref, verbose, print_iter)
+    iter = 1
     return function callback(tree, node; node_infeasible = false, worse_than_incumbent = false)
 
         time = float(Dates.value(Dates.now() - time_ref))
-        if (node.id == 1 || mod(tree.num_nodes, 100) == 0 ) && verbose
-            println("ID: $(node.id) num_nodes: $(tree.num_nodes) LB: $(tree.lb) Incumbent: $(tree.incumbent) Total Time in s: $(time/1000.0) Time node in s: $(node.time/1000.0) Iterations: $(node.iteration_count)")
+        if (node.id == 1 || mod(iter, print_iter) == 0  || Bonobo.terminated(tree)) && verbose
+            println("Iter: $(iter) ID: $(node.id) num_nodes: $(tree.num_nodes) LB: $(tree.lb) Incumbent: $(tree.incumbent) Total Time in s: $(time/1000.0) Time node in s: $(node.time/1000.0) Iterations: $(node.iteration_count)")
             if node_infeasible
                 println("Node not feasible!")
             elseif worse_than_incumbent
                 println("Node cut because it is worse than the incumbent")
             end
         end
+        iter += 1
 
         # break if time is met
         if tree.root.time_limit < Inf
             if time / 1000.0 ≥ tree.root.time_limit
-                @assert tree.root.Stage == Boscia.SOLVING
-                tree.root.Stage = Boscia.TIME_LIMIT_REACHED
+                if tree.root.Stage == Boscia.SOLVING
+                    @assert tree.root.Stage == Boscia.SOLVING
+                    tree.root.Stage = Boscia.TIME_LIMIT_REACHED
+                end
             end
         end
     end
@@ -389,6 +434,7 @@ function Bonobo.terminated(tree::Bonobo.BnBTree{<:CustomBBNode})
     absgap = tree.incumbent - tree.lb
     if absgap ≤ tree.root.abs_gap
         tree.root.Stage = Boscia.OPT_GAP_REACHED
+        @show absgap
         return true
     end
 
@@ -402,6 +448,7 @@ function Bonobo.terminated(tree::Bonobo.BnBTree{<:CustomBBNode})
     end
     if dual_gap ≤ tree.root.rel_gap
         tree.root.Stage = Boscia.OPT_GAP_REACHED
+        @show dual_gap
         return true
     end
 
