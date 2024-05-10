@@ -7,7 +7,8 @@ m    - number of experiments.
 fusion - boolean deiciding whether we build the fusion or standard problem.
 corr - boolean deciding whether we build the independent or correlated data.   
 """
-function build_data(seed, m, n, fusion, corr)
+function build_data(seed, m, n, fusion, corr; scaling_C=false)
+    @show scaling_C
     # set up
     Random.seed!(seed)
     if corr 
@@ -22,8 +23,9 @@ function build_data(seed, m, n, fusion, corr)
         A = rand(m,n)
         @assert rank(A) == n # check that A has the desired rank!
     end 
-    C = rand(2n, n)
-    C = transpose(C)*C
+    C_hat = rand(2n, n)
+    C = scaling_C ? 1/2n*transpose(C_hat)*C_hat : transpose(C_hat)*C_hat
+
     @assert rank(C) == n
     
     if fusion
@@ -35,14 +37,14 @@ function build_data(seed, m, n, fusion, corr)
         ub = rand(1.0:u, m)
     end
         
-    return A, C, N, ub
+    return A, C, N, ub, C_hat
 end
 
 """
 Build LMO for the problems. Used in Boscia and SCIP. 
 """
 function build_lmo(o, m, N, ub)
-    MOI.set(o, MOI.Silent(), true)
+    MOI.set(o, MOI.Silent(), false)
     MOI.empty!(o)
     x = MOI.add_variables(o, m)
     for i in 1:m
@@ -72,9 +74,12 @@ end
 """
 Build function for the A-criterion. 
 """
-function build_a_criterion(A, fusion; μ=0.0, C=nothing, build_safe=false)
+function build_a_criterion(A, fusion; μ=1e-4, C=nothing, build_safe=false, long_run=false)
     m, n = size(A) 
-    a=m
+    a = m
+    if !fusion && m in [100,120]
+        μ = 1e-3
+    end
     domain_oracle = build_domain_oracle(A, n)
 
     if fusion && C === nothing
@@ -90,15 +95,14 @@ function build_a_criterion(A, fusion; μ=0.0, C=nothing, build_safe=false)
     end
 
     function grad_a!(storage, x)
-        #x = BigFloat.(x) # Setting can be useful for numerical tricky problems
         X = fusion ? C + transpose(A)*diagm(x)*A : transpose(A)*diagm(x)*A + Matrix(μ *I, n, n)
         X = Symmetric(X*X)
         F = cholesky(X)
         for i in 1:length(x)
             storage[i] = LinearAlgebra.tr(- (F \ A[i,:]) * transpose(A[i,:]))/a
         end
-        return storage #float.(storage) # in case of x .= BigFloat(x)
-    end
+        return storage 
+    end 
 
     function f_a_safe(x)
         if !domain_oracle(x)
@@ -114,14 +118,13 @@ function build_a_criterion(A, fusion; μ=0.0, C=nothing, build_safe=false)
         if !domain_oracle(x)
             return fill(Inf, length(x))        
         end
-        #x = BigFloat.(x) # Setting can be useful for numerical tricky problems
         X = fusion ? C + transpose(A)*diagm(x)*A : transpose(A)*diagm(x)*A + Matrix(μ *I, n, n)
         X = Symmetric(X*X)
         F = cholesky(X)
         for i in 1:length(x)
             storage[i] = LinearAlgebra.tr(- (F \ A[i,:]) * transpose(A[i,:]))/a
         end
-        return storage #float.(storage) # in case of x .= BigFloat(x)
+        return storage
     end
 
     if build_safe
@@ -134,9 +137,10 @@ end
 """
 Build function for the D-criterion.
 """
-function build_d_criterion(A, fusion; μ =1e-5, C=nothing, build_safe=false)
+function build_d_criterion(A, fusion; μ =0.0, C=nothing, build_safe=false, long_run=false)
     m, n = size(A)
-    a=m
+    a = m
+    γ = long_run ? m : 1
     domain_oracle = build_domain_oracle(A, n)
 
     if fusion && C === nothing
@@ -145,18 +149,17 @@ function build_d_criterion(A, fusion; μ =1e-5, C=nothing, build_safe=false)
 
     function f_d(x)
         X = fusion ? C + transpose(A)*diagm(x)*A : transpose(A)*diagm(x)*A + Matrix(μ *I, n, n)
-        X = Symmetric(X)
-        return -log(det(X))/a
+        X = Symmetric(X * 1/γ)
+        return float(-log(det(X))/a)
     end
 
     function grad_d!(storage, x)
         X = fusion ? C + transpose(A)*diagm(x)*A : transpose(A)*diagm(x)*A + Matrix(μ *I, n, n)
-        X= Symmetric(X)
+        X= Symmetric(X * 1/γ)
         F = cholesky(X) 
         for i in 1:length(x)        
-            storage[i] = 1/a * LinearAlgebra.tr(-(F \ A[i,:] )*transpose(A[i,:]))
+            storage[i] = 1/a * LinearAlgebra.tr(-(F \ A[i,:] )*transpose(A[i,:])) * 1/γ
         end
-        # https://stackoverflow.com/questions/46417005/exclude-elements-of-array-based-on-index-julia
         return storage
     end
 
@@ -165,8 +168,8 @@ function build_d_criterion(A, fusion; μ =1e-5, C=nothing, build_safe=false)
             return Inf
         end
         X = fusion ? C + transpose(A)*diagm(x)*A : transpose(A)*diagm(x)*A + Matrix(μ *I, n, n)
-        X = Symmetric(X)
-        return -log(det(X))/a
+        X = Symmetric(X*1/γ)
+        return float(-log(det(X))/a)
     end
 
     function grad_d_safe!(storage, x)
@@ -174,10 +177,10 @@ function build_d_criterion(A, fusion; μ =1e-5, C=nothing, build_safe=false)
             return fill(Inf, length(x))
         end
         X = fusion ? C + transpose(A)*diagm(x)*A : transpose(A)*diagm(x)*A + Matrix(μ *I, n, n)
-        X= Symmetric(X)
+        X= Symmetric(X*1/γ)
         F = cholesky(X) 
         for i in 1:length(x)        
-            storage[i] = 1/a * LinearAlgebra.tr(-(F \ A[i,:] )*transpose(A[i,:]))
+            storage[i] = 1/a * LinearAlgebra.tr(-(F \ A[i,:] )*transpose(A[i,:])) * 1/γ
         end
         # https://stackoverflow.com/questions/46417005/exclude-elements-of-array-based-on-index-julia
         return storage
@@ -192,69 +195,75 @@ end
 
 function build_general_trace(A, p, fusion; C=nothing, μ=0.0, build_safe=false)
     m, n = size(A) 
-    a=m
+    a = 1
     domain_oracle = build_domain_oracle(A, n)
 
     if fusion && C === nothing
         @error("For the fusion problem, please provide a matrix C.")
     end
 
-    function f_a(x)
+    function f_gti(x)
         X = fusion ? C + transpose(A)*diagm(x)*A : transpose(A)*diagm(x)*A + Matrix(μ *I, n, n)
-        X = Symmetric(X^p)
-        return LinearAlgebra.tr(X)/a 
-    end
-
-    function grad_a!(storage, x)
-        #x = BigFloat.(x) # Setting can be useful for numerical tricky problems
-        X = fusion ? C + transpose(A)*diagm(x)*A : transpose(A)*diagm(x)*A + Matrix(μ *I, n, n)
-        X = Symmetric(X^(p-1))
-        #F = cholesky(X)
-        for i in 1:length(x)
-            storage[i] = (p/a) * A[i,:]' * X * A[i,:]
+        X= Symmetric(X)
+        if p == 0
+            return -log(det(X))
         end
-        return storage #float.(storage) # in case of x .= BigFloat(x)
+        return -1/p * log(LinearAlgebra.tr(Symmetric(X^p))) # 1/n *
     end
 
-    function f_a_safe(x)
+    function grad_gti!(storage, x)
+        X = fusion ? C + transpose(A)*diagm(x)*A : transpose(A)*diagm(x)*A + Matrix(μ *I, n, n)
+        X=Symmetric(X)
+        a = p == 0 ? -1 : -1/(LinearAlgebra.tr(Symmetric(X^p)))
+        X =Symmetric(X^(p-1))
+        for i in 1:m
+            storage[i] = a* A[i,:]' * X * A[i,:]
+        end
+        return storage
+    end
+
+    function f_gti_safe(x)
         if !domain_oracle(x)
             return Inf
         end
         X = fusion ? C + transpose(A)*diagm(x)*A : transpose(A)*diagm(x)*A + Matrix(μ *I, n, n)
-        X = Symmetric(X^p)
-       # X_inv = LinearAlgebra.inv(X)
-        return LinearAlgebra.tr(X)/a 
+        X= Symmetric(X)
+        if p == 0
+            return -log(det(1/n*X))
+        end
+        return -1/p * log(LinearAlgebra.tr(Symmetric(X^p))) # 1/n *
     end
 
-    function grad_a_safe!(storage, x)
+    function grad_gti_safe!(storage, x)
         if !domain_oracle(x)
             return fill(Inf, length(x))        
         end
-        #x = BigFloat.(x) # Setting can be useful for numerical tricky problems
         X = fusion ? C + transpose(A)*diagm(x)*A : transpose(A)*diagm(x)*A + Matrix(μ *I, n, n)
-        X = Symmetric(X^(p-1))
-       # F = cholesky(X)
-        for i in 1:length(x)
-            storage[i] = (p/a) * A[i,:]' * X * A[i,:] 
+        X=Symmetric(X)
+        a = p == 0 ? -1 : -1/(LinearAlgebra.tr(Symmetric(X^p)))
+        X =Symmetric(X^(p-1))
+        for i in 1:m
+            storage[i] = a* A[i,:]' * X * A[i,:]
         end
-        return storage #float.(storage) # in case of x .= BigFloat(x)
+        return storage
     end
 
     if build_safe
-        return f_a_safe, grad_a_safe!
+        return f_gti_safe, grad_gti_safe!
     end
 
-    return f_a, grad_a!
+    return f_gti, grad_gti!
 end
 
 """
 Build general matrix means objective: log(ϕ(X))
 """
-function build_matrix_means_objective(A,p;C=nothing)
+function build_matrix_means_objective(A,p;μ=0.0, C_hat=nothing, build_safe=false)
     m,n = size(A)
+    domain_oracle = build_domain_oracle(A, n)
 
     function inf_matrix(x)
-        X = C===nothing ? A' * diagm(x) * A : C + A' * diagm(x) * A
+        X = C_hat===nothing ? A' * diagm(x) * A + Matrix(μ *I, n, n) : C_hat' * diagm(x[m+1:m+2n]) * C_hat + A' * diagm(x[1:m]) * A
         return X
     end
 
@@ -278,6 +287,33 @@ function build_matrix_means_objective(A,p;C=nothing)
         return storage
     end
 
+    function f_safe(x)
+        if !domain_oracle(x)
+            return Inf
+        end
+        X = inf_matrix(x)
+        X=Symmetric(X)
+        if p == 0
+            @assert det(1/n*X) > 0 "Determinat is $(det(1/n*X)) and x is $(x)"
+            return -log(det(1/n*X))
+        end
+        return -1/p * log(LinearAlgebra.tr(Symmetric(X^p))) # 1/n *
+    end
+
+    function grad_safe!(storage, x)
+        if !domain_oracle(x)
+            return fill(Inf, length(x))        
+        end
+        X = inf_matrix(x)
+        X=Symmetric(X)
+        a = p == 0 ? -1 : -1/(LinearAlgebra.tr(Symmetric(X^p)))
+        X =Symmetric(X^(p-1))
+        for i in 1:m
+            storage[i] = a* A[i,:]' * X * A[i,:]
+        end
+        return storage
+    end
+
     function linesearch(node, f, grad!, gradient, x, d, theta_max, linesearch_workspace, iter_count, jdx, kdx)
         theta = 0.0
         X = inf_matrix(x)
@@ -287,13 +323,11 @@ function build_matrix_means_objective(A,p;C=nothing)
         w_k = A[kdx,:]' * X_inv * A[kdx,:] 
         # D Optimality
         if p == 0
-            if isapprox(w_jk^2, w_k*w_j)
-                theta = min(node.upper_bounds[jdx] - x[jdx], x[kdx] - node.lower_bounds[kdx])
-            elseif w_jk^2 < w_k*w_j
+            if w_jk^2 < w_k*w_j
                 theta_bar = (w_j-w_k) / (2(w_j*w_k - w_jk^2))
                 theta = min(node.upper_bounds[jdx] - x[jdx], x[kdx] - node.lower_bounds[kdx], theta_bar)
             else
-                error("W_jk^2 : $(w_jk^2) is greater than w_j*w_k: $(w_j*w_k)")
+                theta = min(node.upper_bounds[jdx] - x[jdx], x[kdx] - node.lower_bounds[kdx])
             end
         # A Optimality 
         elseif p == -1
@@ -325,7 +359,7 @@ function build_matrix_means_objective(A,p;C=nothing)
                     grad!,
                     gradient,
                     x,
-                    d,
+                    -d,
                     theta_max,
                     linesearch_workspace,
                     FrankWolfe.InplaceEmphasis(),
@@ -334,6 +368,9 @@ function build_matrix_means_objective(A,p;C=nothing)
         return theta
     end
 
+    if build_safe
+        return f_safe, grad_safe!, linesearch
+    end 
     return f, grad!, linesearch
 end
 
@@ -419,10 +456,10 @@ function linearly_independent_rows(A, m ,n)
 end
 
 """
-Build start point used in Boscia in case of A-opt and D-opt.
+Build start point used in FrankWolfe and Boscia in case of A-opt and D-opt.
 The functions are self concordant and so not every point in the feasible region
 is in the domain of f and grad!.
-"""
+""" 
 function build_start_point2(A, m, n, N, ub)
     # Get n linearly independent rows of A
     S = linearly_independent_rows(A,m,n)
@@ -431,7 +468,6 @@ function build_start_point2(A, m, n, N, ub)
     x = zeros(m)
     E = []
     V = Vector{Float64}[]
-
 
     while !isempty(setdiff(S, findall(x-> !(iszero(x)),x)))
         v = zeros(m)
@@ -511,23 +547,21 @@ end
 Check if a point is linear feasible with respect to the original model
 """
 function isfeasible(seed, m, n, criterion, x, corr; N=0)
-    if criterion == "A" || criterion == "D"
-        A, _, N, ub = build_data(seed, m, n, false, corr)
-    elseif criterion == "AF"|| criterion == "DF"
-        A, C, N, ub = build_data(seed, m, n, true, corr)
+    if criterion in ["A","D","GTI"]
+        A, _, N, ub, _ = build_data(seed, m, n, false, corr)
+    elseif criterion in ["AF","DF","GTIF"]
+        A, C, N, ub, _ = build_data(seed, m, n, true, corr)
     end
 
    if sum(x) < N - 1e-4
         return false
    elseif sum(x.>=0-1e-4) != m
         return false
-   elseif sum(ub-x.>= 0-1e-4) != m
+   elseif sum(ub - x.>= 0-1e-4) != m
         return false
-   elseif criterion in ["D", "A"] && m - sum(iszero.(x)) < n 
+   elseif criterion in ["D", "A", "GTI"] && m - sum(iszero.(x)) < n 
         return false
    else
         return true
    end
 end
-
-  
