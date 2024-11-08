@@ -28,7 +28,7 @@ function check_gradients(grad!, f, gradient, num_tests=10, tolerance=1.0e-5)
 end
 
 
-@testset "Derivative A-opt" begin
+@testset "Derivative A-Opt" begin
     for dim in [20,50,80]
         n = Int(floor(dim/4))
         @show dim, n
@@ -40,7 +40,7 @@ end
     end
 end
 
-@testset "Derivative D-opt" begin
+@testset "Derivative D-Opt" begin
     for dim in [20,50,80]
         n = Int(floor(dim/4))
         @show dim, n
@@ -51,6 +51,33 @@ end
         @test check_gradients(grad!, f, gradient)
     end
 end
+
+@testset "Sanity check smoothing" begin
+    for dim in [20, 50, 80]
+        for mu in [0.2, 0.5, 1.0]
+            for _ in 1:10
+                x = rand(dim)
+                n = Int(floor(dim/10))
+                A, _, _, _, _ = ODWB.build_data(seed, dim, n, false, false)
+                f, f_mu, _ = ODWB.build_e_criterion(A, μ=mu)
+
+                @test f(x) >= f_mu(x)
+            end
+        end
+    end
+end
+
+@testset "Derivative E-opt" begin
+    for dim in [20,50,80]
+        n = Int(floor(dim/4))
+        @show dim, n
+        gradient = rand(dim)
+        A, _, _, _, _ = ODWB.build_data(seed,dim, n, false, false)
+        #f, grad! = ODWB.build_d_criterion(A, false, build_safe=true)
+
+        #@test check_gradients(grad!, f, gradient)
+    end
+end 
 
 @testset "Derivative A-Fusion" begin
     for dim in [20,50,80]
