@@ -8,7 +8,6 @@ fusion - boolean deiciding whether we build the fusion or standard problem.
 corr - boolean deciding whether we build the independent or correlated data.   
 """
 function build_data(seed, m, n, fusion, corr; scaling_C=false)
-    @show scaling_C
     # set up
     Random.seed!(seed)
     if corr 
@@ -191,6 +190,36 @@ function build_d_criterion(A, fusion; μ =0.0, C=nothing, build_safe=false, long
     end
 
     return f_d, grad_d!
+end
+
+"""
+Build the E-criterion and its smoothed version.
+"""
+function build_e_criterion(A; μ=0.0)
+    m, n = size(A)
+    function inf_matrix(x)
+        return Symmetric(A' * diagm(x) * A)
+    end
+
+    function f(x)
+        X = inf_matrix(x)   
+        return (-1) * minimum(eigvals(X))    
+    end
+
+    function f_mu(x)
+        X = inf_matrix(x)
+        λ = eigvals(X)
+        return μ * log(sum(exp.(-λ ./ μ))) - μ * log(n)
+    end
+
+    function grad_mu!(storage, x)
+        X = inf_matrix(x)
+        # TODO
+        return
+    end
+
+    return f, f_mu, grad_mu!
+
 end
 
 function build_general_trace(A, p, fusion; C=nothing, μ=0.0, build_safe=false)
