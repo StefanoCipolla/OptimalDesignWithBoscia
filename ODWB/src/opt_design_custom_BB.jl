@@ -378,11 +378,11 @@ function solve_opt_custom(seed, m, n, time_limit, criterion, corr; p=0, write = 
         type = corr ? "correlated" : "independent"
         df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=time, time_per_nodes=time_per_nodes, solution=solution, solution_scaled=solution_scaled, dual_gap=dual_gap, number_nodes=tree.num_nodes, termination=status)
         if long_run
-            file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/CustomBB/long_runs/custombb_" * criterion * "_" * string(m) * "_" * type * "_optimality.csv"
+            file_name = "/Users/stefanocipolla/Library/CloudStorage/OneDrive-UniversityofSouthampton/Southampton_Work/OptimalDesignWithBoscia/Results/custombb_" * criterion * "_" * string(m) * "_" * type * "_optimality.csv"
         elseif specific_seed
-            file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/CustomBB/custombb_" * criterion * "_" * string(m) * "_" * string(n) * "_" * type * "_" * string(seed) * "_optimality.csv"
+            file_name = "/Users/stefanocipolla/Library/CloudStorage/OneDrive-UniversityofSouthampton/Southampton_Work/OptimalDesignWithBoscia/Results/custombb_" * criterion * "_" * string(m) * "_" * string(n) * "_" * type * "_" * string(seed) * "_optimality.csv"
         else
-            file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/CustomBB/custombb_" * criterion * "_" * string(m) * "_" * type * "_optimality.csv"
+            file_name = "/Users/stefanocipolla/Library/CloudStorage/OneDrive-UniversityofSouthampton/Southampton_Work/OptimalDesignWithBoscia/Results/custombb_" * criterion * "_" * string(m) * "_" * type * "_optimality.csv"
         end
         if !isfile(file_name)
             CSV.write(file_name, df, append=true, writeheader=true)
