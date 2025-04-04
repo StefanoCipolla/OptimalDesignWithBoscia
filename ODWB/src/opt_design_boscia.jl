@@ -41,12 +41,31 @@
 # m - number of possible experiments
 # A = [v_1^T,.., v_m^T], so the rows of A correspond to the different experiments
 
-function solve_opt(seed, m, n, time_limit, criterion, corr; full_callback=true, write = true, verbose = true, use_scip=false, do_strong_branching=false, use_shadow_set=false, lazy_tolerance=2.0, use_heuristics=false, use_tightening=false, long_runs=false, options_run=false)
+function solve_opt(seed, m, n, time_limit, criterion, corr; full_callback=true, p=0, write = true, verbose = true, use_scip=false, do_strong_branching=false, use_shadow_set=false, lazy_tolerance=2.0, use_heuristics=false, use_tightening=false, long_runs=false, options_run=false, fw_verbose=false, specific_seed=false)
     
     if criterion == "AF" || criterion == "DF"
-        A, C, N, ub = build_data(seed, m, n, true, corr)
+        A, C, N, ub, _ = build_data(seed, m, n, true, corr; scaling_C=long_runs && criterion != "AF" && criterion != "DF")
     else
-        A, _, N, ub = build_data(seed, m, n, false, corr)
+        A, _, N, ub, _ = build_data(seed, m, n, false, corr; scaling_C=long_runs)
+    end
+
+    # parameter tunning
+    if !options_run
+        use_heuristics = true
+        if !(criterion in ["D","DF"])
+            use_shadow_set = true
+        elseif !(criterion in ["A","AF"])
+            lazy_tolerance = 1.5
+        end
+    end
+
+    if long_runs
+        use_heuristics = true
+        if criterion in ["A","AF"]
+            use_shadow_set = true
+        elseif criterion in ["D","DF"]
+            lazy_tolerance = 1.5
+        end
     end
 
     if use_scip
@@ -74,45 +93,55 @@ function solve_opt(seed, m, n, time_limit, criterion, corr; full_callback=true, 
     result = 0.0
     domain_oracle = build_domain_oracle(A, n)
 
+    println("build function")
     if criterion == "A"
-        f, grad! = build_a_criterion(A, false, μ=1e-4, build_safe=true)
+        f, grad! = build_a_criterion(A, false, μ=1e-4, build_safe=true, long_run=long_runs)
+        #f, grad! = build_general_trace(A, -1, false, build_safe=true)  # Log(Tr(X^{-1}))
     elseif criterion == "AF"
-        f, grad! = build_a_criterion(A, true, C=C)
+        f, grad! = build_a_criterion(A, true, C=C, long_run=long_runs)
+        #f, grad! = build_general_trace(A, -1, true, C=C) # Log(Tr(X^{-1}))
     elseif criterion =="D" 
-        f, grad! = build_d_criterion(A, false, μ=1e-4, build_safe=true)
+        f, grad! = build_d_criterion(A, false, μ=1e-4, build_safe=true, long_run=long_runs)
     elseif criterion == "DF"
-        f, grad! = build_d_criterion(A, true, C=C)
+        f, grad! = build_d_criterion(A, true, C=C, long_run=long_runs)
     else
         error("Invalid criterion!")
     end
 
 
-    if criterion == "AF" || criterion == "DF"
+    if criterion in ["AF","DF"]
         direction = collect(1.0:m)
-            x0 = compute_extreme_point(lmo, direction)
-        active_set= FrankWolfe.ActiveSet([(1.0, x0)])    
-        # Precompile
-        x, _, result = Boscia.solve(f, grad!, lmo; verbose=false, time_limit=10, active_set=active_set, branching_strategy=branching_strategy, use_shadow_set=use_shadow_set, dual_tightening=use_tightening, global_dual_tightening=use_tightening, lazy_tolerance=lazy_tolerance, custom_heuristics=[heu])
+        x0 = compute_extreme_point(lmo, direction)
+        active_set= FrankWolfe.ActiveSet([(1.0, x0)])   
+        # set same incumbent as for Co-BnB
+        z = greedy_incumbent_fusion(A,m,n,N,ub)
 
-        x, _, result = Boscia.solve(f, grad!, lmo; verbose=verbose, time_limit=time_limit, active_set=active_set, branching_strategy=branching_strategy, use_shadow_set=use_shadow_set, dual_tightening=use_tightening, global_dual_tightening=use_tightening, lazy_tolerance=lazy_tolerance, custom_heuristics=[heu] )
-    else
         # Precompile
+        x, _, result = Boscia.solve(f, grad!, lmo; verbose=false, time_limit=10, active_set=active_set, branching_strategy=branching_strategy, use_shadow_set=use_shadow_set, dual_tightening=use_tightening, global_dual_tightening=use_tightening, lazy_tolerance=lazy_tolerance, custom_heuristics=[heu], start_solution=z)
+
+        # Actual Run
+        x, _, result = Boscia.solve(f, grad!, lmo; verbose=verbose, time_limit=time_limit, active_set=active_set, branching_strategy=branching_strategy, use_shadow_set=use_shadow_set, dual_tightening=use_tightening, global_dual_tightening=use_tightening, lazy_tolerance=lazy_tolerance, custom_heuristics=[heu], fw_verbose=fw_verbose, start_solution=z)
+    else
         _, active_set, S = build_start_point2(A, m, n, N, ub)
         z = greedy_incumbent(A, m, n, N, ub)
-        x, _, result = Boscia.solve(f, grad!, lmo; verbose=false, time_limit=10, active_set=active_set, domain_oracle=domain_oracle, start_solution=z, dual_tightening=use_tightening, global_dual_tightening=use_tightening, lazy_tolerance=lazy_tolerance, branching_strategy=branching_strategy, use_shadow_set=use_shadow_set, custom_heuristics=[heu]) #line_search=StepSizeRule, 
+
+        # Precompile
+        x, _, result = Boscia.solve(f, grad!, lmo; verbose=false, time_limit=10, active_set=active_set, domain_oracle=domain_oracle, start_solution=z, dual_tightening=use_tightening, global_dual_tightening=use_tightening, lazy_tolerance=lazy_tolerance, branching_strategy=branching_strategy, use_shadow_set=use_shadow_set, custom_heuristics=[heu]) 
         
-        # real run
-        # Find a good start point
         _, active_set, S = build_start_point2(A, m, n, N, ub)
-        # initial upper bound
         z = greedy_incumbent(A, m, n, N, ub)
-        x, _, result = Boscia.solve(f, grad!, lmo; verbose=verbose, time_limit=time_limit, active_set=active_set, domain_oracle=domain_oracle, start_solution=z,  dual_tightening=use_tightening, global_dual_tightening=use_tightening, lazy_tolerance=lazy_tolerance, branching_strategy=branching_strategy, use_shadow_set=use_shadow_set, custom_heuristics=[heu]) #line_search=StepSizeRule, 
+
+        # Actual run
+        x, _, result = Boscia.solve(f, grad!, lmo; verbose=verbose, time_limit=time_limit, active_set=active_set, domain_oracle=domain_oracle, start_solution=z,  dual_tightening=use_tightening, global_dual_tightening=use_tightening, lazy_tolerance=lazy_tolerance, branching_strategy=branching_strategy, use_shadow_set=use_shadow_set, custom_heuristics=[heu], fw_verbose=fw_verbose) 
     end
 
     total_time_in_sec=result[:total_time_in_sec]
     status = result[:status]
     if occursin("Optimal", result[:status])
         status = "OPTIMAL"
+    end
+    if occursin("Time", result[:status])
+        status = "TIME_LIMIT"
     end
     if full_callback
         lb_list = result[:list_lb]
@@ -124,7 +153,23 @@ function solve_opt(seed, m, n, time_limit, criterion, corr; full_callback=true, 
     end
 
     if write
-        if options_run
+        if long_runs
+            # CSV file for the full callback
+            type = corr ? "correlated" : "independent"
+            df_full_cb = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=time_list, lowerBound=lb_list, upperBound =ub_list, termination=status, LMOcalls =list_lmo_calls, localTighteings=list_local_tightening, globalTightenings=list_global_tightening)
+            file_name_full_cb = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/full_runs_boscia/long_runs/boscia_"* criterion * "_optimality_" * type *"_" * string(m) * "-" * string(n) * "_" * string(seed) *".csv"
+            CSV.write(file_name_full_cb, df_full_cb, append=false)
+
+            # CSV file for the results of all instances.
+            scaled_solution = result[:primal_objective]*m
+            df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=total_time_in_sec, solution=result[:primal_objective], scaled_solution=scaled_solution, dual_gap = result[:dual_gap],  rel_dual_gap=result[:rel_dual_gap], ncalls=result[:lmo_calls], num_nodes=result[:number_nodes],termination=status)
+            file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/Boscia/long_runs/boscia_" * criterion * "_" * string(m) * "_" * type *"_optimality.csv"
+            if !isfile(file_name) 
+                CSV.write(file_name, df, append=true, writeheader=true, delim=";")
+            else 
+                CSV.write(file_name, df, append=true, delim=";")
+            end
+        elseif options_run
             # CSV file for the full callback
             type = corr ? "correlated" : "independent"
             option = if use_scip
@@ -144,29 +189,13 @@ function solve_opt(seed, m, n, time_limit, criterion, corr; full_callback=true, 
             end
 
             df_full_cb = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=time_list, lowerBound=lb_list, upperBound =ub_list, termination=status, LMOcalls =list_lmo_calls, localTighteings=list_local_tightening, globalTightenings=list_global_tightening)
-            file_name_full_cb = joinpath(@__DIR__, "../csv/full_runs_boscia/" * option * "/boscia_"* criterion * "_optimality_" * type *"_" * string(m) * "-" * string(n) * "_" * string(seed) *".csv")
-        CSV.write(file_name_full_cb, df_full_cb, append=false)
+            file_name_full_cb = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/full_runs_boscia/" * option * "/boscia_"* criterion * "_optimality_" * type *"_" * string(m) * "-" * string(n) * "_" * string(seed) *".csv"
+            CSV.write(file_name_full_cb, df_full_cb, append=false)
 
             # CSV file for the results of all instances.
             scaled_solution = result[:primal_objective]*m
             df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=total_time_in_sec, solution=result[:primal_objective], scaled_solution=scaled_solution, dual_gap = result[:dual_gap],  rel_dual_gap=result[:rel_dual_gap], ncalls=result[:lmo_calls], num_nodes=result[:number_nodes],termination=status)
-            file_name = joinpath(@__DIR__, "../csv/Boscia/" * option * "/boscia_" * criterion * "_" * string(m) * "_" * type *"_optimality.csv")
-            if !isfile(file_name) 
-                CSV.write(file_name, df, append=true, writeheader=true, delim=";")
-            else 
-                CSV.write(file_name, df, append=true, delim=";")
-            end
-        elseif long_runs
-            # CSV file for the full callback
-            type = corr ? "correlated" : "independent"
-            df_full_cb = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=time_list, lowerBound=lb_list, upperBound =ub_list, termination=status, LMOcalls =list_lmo_calls, localTighteings=list_local_tightening, globalTightenings=list_global_tightening)
-            file_name_full_cb = joinpath(@__DIR__, "../csv/full_runs_boscia/long_runs/boscia_"* criterion * "_optimality_" * type *"_" * string(m) * "-" * string(n) * "_" * string(seed) *".csv")
-        CSV.write(file_name_full_cb, df_full_cb, append=false)
-
-            # CSV file for the results of all instances.
-            scaled_solution = result[:primal_objective]*m
-            df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=total_time_in_sec, solution=result[:primal_objective], scaled_solution=scaled_solution, dual_gap = result[:dual_gap],  rel_dual_gap=result[:rel_dual_gap], ncalls=result[:lmo_calls], num_nodes=result[:number_nodes],termination=status)
-            file_name = joinpath(@__DIR__, "../csv/Boscia/long_runs/boscia_" * criterion * "_" * string(m) * "_" * type *"_optimality.csv")
+            file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/Boscia/" * option * "/boscia_" * criterion * "_" * string(m) * "_" * type *"_optimality.csv"
             if !isfile(file_name) 
                 CSV.write(file_name, df, append=true, writeheader=true, delim=";")
             else 
@@ -176,13 +205,17 @@ function solve_opt(seed, m, n, time_limit, criterion, corr; full_callback=true, 
             # CSV file for the full callback
             type = corr ? "correlated" : "independent"
             df_full_cb = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=time_list, lowerBound=lb_list, upperBound =ub_list, termination=status, LMOcalls =list_lmo_calls, localTighteings=list_local_tightening, globalTightenings=list_global_tightening)
-            file_name_full_cb = joinpath(@__DIR__, "../csv/full_runs_boscia/boscia_"* criterion * "_optimality_" * type *"_" * string(m) * "-" * string(n) * "_" * string(seed) *".csv")
-        CSV.write(file_name_full_cb, df_full_cb, append=false)
+            file_name_full_cb = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/full_runs_boscia/boscia_"* criterion * "_optimality_" * type *"_" * string(m) * "-" * string(n) * "_" * string(seed) *".csv"
+            CSV.write(file_name_full_cb, df_full_cb, append=false)
 
             # CSV file for the results of all instances.
             scaled_solution = result[:primal_objective]*m
             df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=total_time_in_sec, solution=result[:primal_objective], scaled_solution=scaled_solution, dual_gap = result[:dual_gap],  rel_dual_gap=result[:rel_dual_gap], ncalls=result[:lmo_calls], num_nodes=result[:number_nodes],termination=status)
-            file_name = joinpath(@__DIR__, "../csv/Boscia/boscia_" * criterion * "_" * string(m) * "_" * type *"_optimality.csv")
+            if specific_seed
+                file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/Boscia/boscia_" * criterion * "_" * string(m) * "_" * string(n) * "_" * type * "_" * string(seed) * "_optimality.csv"
+            else
+                file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/Boscia/boscia_" * criterion * "_" * string(m) * "_" * type *"_optimality.csv"
+            end
             if !isfile(file_name) 
                 CSV.write(file_name, df, append=true, writeheader=true, delim=";")
             else 
@@ -203,10 +236,10 @@ function solve_opt(seed, m, n, time_limit, criterion, corr; full_callback=true, 
         end
         @show result[:primal_objective]
         @show result[:dual_gap]
+        @show result[:primal_objective] - result[:dual_gap]
         @show x
         @show sum(x)
         @show N
-       # @assert isapprox(sum(x), N)
     end
 
     return x, result
