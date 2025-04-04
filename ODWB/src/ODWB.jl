@@ -36,5 +36,6 @@ include("opt_design_pajarito.jl")
 include("opt_design_custom_BB.jl")
 include("opt_design_custom_BB_ext.jl")
 include("build_data_ext.jl")
+include("opt_design_boscia_ext.jl")
 
 end # module ODWB
