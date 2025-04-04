@@ -34,5 +34,7 @@ include("opt_design_scip.jl")
 include("spectral_functions_JuMP.jl")
 include("opt_design_pajarito.jl")
 include("opt_design_custom_BB.jl")
+include("opt_design_custom_BB_ext.jl")
+include("build_data_ext.jl")
 
 end # module ODWB

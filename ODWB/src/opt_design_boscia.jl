@@ -163,7 +163,7 @@ function solve_opt(seed, m, n, time_limit, criterion, corr; full_callback=true, 
             # CSV file for the results of all instances.
             scaled_solution = result[:primal_objective]*m
             df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=total_time_in_sec, solution=result[:primal_objective], scaled_solution=scaled_solution, dual_gap = result[:dual_gap],  rel_dual_gap=result[:rel_dual_gap], ncalls=result[:lmo_calls], num_nodes=result[:number_nodes],termination=status)
-            file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/Boscia/long_runs/boscia_" * criterion * "_" * string(m) * "_" * type *"_optimality.csv"
+            file_name = "/Users/stefanocipolla/Library/CloudStorage/OneDrive-UniversityofSouthampton/Southampton_Work/OptimalDesignWithBoscia/Results/boscia_" * criterion * "_" * string(m) * "_" * type *"_optimality.csv"
             if !isfile(file_name) 
                 CSV.write(file_name, df, append=true, writeheader=true, delim=";")
             else 
@@ -189,13 +189,13 @@ function solve_opt(seed, m, n, time_limit, criterion, corr; full_callback=true, 
             end
 
             df_full_cb = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=time_list, lowerBound=lb_list, upperBound =ub_list, termination=status, LMOcalls =list_lmo_calls, localTighteings=list_local_tightening, globalTightenings=list_global_tightening)
-            file_name_full_cb = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/full_runs_boscia/" * option * "/boscia_"* criterion * "_optimality_" * type *"_" * string(m) * "-" * string(n) * "_" * string(seed) *".csv"
+            file_name_full_cb = "/Users/stefanocipolla/Library/CloudStorage/OneDrive-UniversityofSouthampton/Southampton_Work/OptimalDesignWithBoscia/Results/" * option * "/boscia_"* criterion * "_optimality_" * type *"_" * string(m) * "-" * string(n) * "_" * string(seed) *".csv"
             CSV.write(file_name_full_cb, df_full_cb, append=false)
 
             # CSV file for the results of all instances.
             scaled_solution = result[:primal_objective]*m
             df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=total_time_in_sec, solution=result[:primal_objective], scaled_solution=scaled_solution, dual_gap = result[:dual_gap],  rel_dual_gap=result[:rel_dual_gap], ncalls=result[:lmo_calls], num_nodes=result[:number_nodes],termination=status)
-            file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/Boscia/" * option * "/boscia_" * criterion * "_" * string(m) * "_" * type *"_optimality.csv"
+            file_name = "/Users/stefanocipolla/Library/CloudStorage/OneDrive-UniversityofSouthampton/Southampton_Work/OptimalDesignWithBoscia/Results/" * option * "/boscia_" * criterion * "_" * string(m) * "_" * type *"_optimality.csv"
             if !isfile(file_name) 
                 CSV.write(file_name, df, append=true, writeheader=true, delim=";")
             else 
@@ -205,16 +205,16 @@ function solve_opt(seed, m, n, time_limit, criterion, corr; full_callback=true, 
             # CSV file for the full callback
             type = corr ? "correlated" : "independent"
             df_full_cb = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=time_list, lowerBound=lb_list, upperBound =ub_list, termination=status, LMOcalls =list_lmo_calls, localTighteings=list_local_tightening, globalTightenings=list_global_tightening)
-            file_name_full_cb = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/full_runs_boscia/boscia_"* criterion * "_optimality_" * type *"_" * string(m) * "-" * string(n) * "_" * string(seed) *".csv"
+            file_name_full_cb = "/Users/stefanocipolla/Library/CloudStorage/OneDrive-UniversityofSouthampton/Southampton_Work/OptimalDesignWithBoscia/Results/boscia_"* criterion * "_optimality_" * type *"_" * string(m) * "-" * string(n) * "_" * string(seed) *".csv"
             CSV.write(file_name_full_cb, df_full_cb, append=false)
 
             # CSV file for the results of all instances.
             scaled_solution = result[:primal_objective]*m
             df = DataFrame(seed=seed, numberOfExperiments=m, numberOfParameters=n, N=N, time=total_time_in_sec, solution=result[:primal_objective], scaled_solution=scaled_solution, dual_gap = result[:dual_gap],  rel_dual_gap=result[:rel_dual_gap], ncalls=result[:lmo_calls], num_nodes=result[:number_nodes],termination=status)
             if specific_seed
-                file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/Boscia/boscia_" * criterion * "_" * string(m) * "_" * string(n) * "_" * type * "_" * string(seed) * "_optimality.csv"
+                file_name = "/Users/stefanocipolla/Library/CloudStorage/OneDrive-UniversityofSouthampton/Southampton_Work/OptimalDesignWithBoscia/Results/boscia_" * criterion * "_" * string(m) * "_" * string(n) * "_" * type * "_" * string(seed) * "_optimality.csv"
             else
-                file_name = "/home/htc/dhendryc/research_projects/MasterThesis/optDesign/csv/Boscia/boscia_" * criterion * "_" * string(m) * "_" * type *"_optimality.csv"
+                file_name = "//Users/stefanocipolla/Library/CloudStorage/OneDrive-UniversityofSouthampton/Southampton_Work/OptimalDesignWithBoscia/Results/boscia_" * criterion * "_" * string(m) * "_" * type *"_optimality.csv"
             end
             if !isfile(file_name) 
                 CSV.write(file_name, df, append=true, writeheader=true, delim=";")
