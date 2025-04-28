@@ -1,3 +1,4 @@
+__precompile__(false)
 module ODWB
 using Boscia
 using FrankWolfe
@@ -39,3 +40,10 @@ include("build_data_ext.jl")
 include("opt_design_boscia_ext.jl")
 
 end # module ODWB
+
+# How to the code working:
+#using Pkg
+#cd("/Users/stefanocipolla/Library/CloudStorage/OneDrive-UniversityofSouthampton/Southampton_Work/OptimalDesignWithBoscia/ODWB")
+#Pkg.activate(".")
+#Pkg.develop(url="https://github.com/chriscoey/PajaritoExtras.jl")
+#Pkg.instantiate()

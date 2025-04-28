@@ -22,9 +22,22 @@ long_run =false
 #ODWB.solve_opt_custom(seed, m, n, time_limit, criterion, corr)
 
 A, C, N, ub, C_hat = ODWB.build_data_ext(seed, m, n, criterion in ["AF", "DF", "GTIF"], corr, scaling_C=long_run)
-solution = ODWB.solve_opt_custom_ext(seed, m, n, 60, criterion, corr;
+
+
+
+solution_custom = ODWB.solve_opt_custom_ext(seed, m, n, 60, criterion, corr;
                             A_external=A,
                             C_external=C,
                             N_external=N,
                             ub_external=ub,
                             C_hat_external=C_hat)
+solution_boscia = ODWB.solve_opt_ext(seed, m, n, 60, criterion,corr;
+                                 A_external=A,
+                                 C_external=C,
+                                 N_external=N,
+                                 ub_external=ub,
+                                 C_hat_external=C_hat)                       
+file = matopen("BosciaGenerated.mat", "w")
+write(file, "X", A)
+write(file, "N", N)
+close(file)
