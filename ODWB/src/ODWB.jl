@@ -1,4 +1,4 @@
-__precompile__(false)
+#__precompile__(false)
 module ODWB
 using Boscia
 using FrankWolfe
@@ -22,6 +22,7 @@ using Dates
 using Test
 using DataFrames
 using CSV
+using MAT
 const MOI = MathOptInterface
 const MOIU = MOI.Utilities
 

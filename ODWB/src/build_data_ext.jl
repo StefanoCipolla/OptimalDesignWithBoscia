@@ -33,8 +33,10 @@ function build_data_ext(seed, m, n, fusion, corr; scaling_C=false)
         ub = rand(1.0:m/10, m)
     else
         N = floor(1.5*n)
-        u = floor(N/3)
-        ub = rand(1.0:u, m)
+        #u = floor(N/3)
+        #ub = rand(1.0:u, m)
+        ub = N.* ones(m)
+        #ub  = fill(Inf,m)
     end
         
     return A, C, N, ub, C_hat
