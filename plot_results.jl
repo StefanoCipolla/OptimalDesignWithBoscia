@@ -21,11 +21,11 @@ using Measures
         #p = @df df_N boxplot(:m_str, :time, group=:m_str,
             #xlabel="m", ylabel="Time (s)", title="N = $N_val", legend=false)
 
-        p = @df df_N violin(:m_str, :time, group=:m_str, 
-                            palette   = pal,
-                            fillalpha = 0.9,    # slightly transparent violins
-                            legend    = false)
-        @df df_N boxplot!(p,:m_str, :time, group=:m_str, 
+        #p = @df df_N violin(:m_str, :time, group=:m_str, 
+                            #palette   = pal,
+                            #fillalpha = 0.9,    # slightly transparent violins
+                            #legend    = false)
+        p = @df df_N boxplot(:m_str, :time, group=:m_str, 
                             palette   = pal,
                             fillalpha = 0.2,    # slightly transparent violins
                             legend    = false)
