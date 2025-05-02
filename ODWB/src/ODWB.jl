@@ -42,7 +42,7 @@ include("opt_design_boscia_ext.jl")
 
 end # module ODWB
 
-# How to the code working:
+# How to make the code working:
 #using Pkg
 #cd("/Users/stefanocipolla/Library/CloudStorage/OneDrive-UniversityofSouthampton/Southampton_Work/OptimalDesignWithBoscia/ODWB")
 #Pkg.activate(".")
