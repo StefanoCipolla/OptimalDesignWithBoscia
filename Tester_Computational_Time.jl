@@ -12,7 +12,7 @@ using DataFrames
     corr = true
     long_run = false
 
-    ms = 100:100:500
+    ms = 100:100:200
     Ns = n:5:20
     num_trials = 10
     nrows = ceil(Int, length(Ns) / 3)
@@ -32,6 +32,12 @@ using DataFrames
                         ub_external=ub,
                         C_hat_external=C_hat)
                     push!(all_data, (N=N_val, m=m, time=elapsed))
+
+                     file_name = "/Users/stefanocipolla/Library/CloudStorage/OneDrive-UniversityofSouthampton/Southampton_Work/Data_Boscia/Boscia_generated" *string(n)* "_" * string(m) * "_" * string(N_val) * "_" * string(trial) * "_.m"
+                     file = ODWB.matopen(file_name, "w")
+                     ODWB.write(file, "X", A)
+                     ODWB.write(file, "N", N)
+                     ODWB.close(file)
                 catch e
                     println("Error for m=$m, N=$N_val, trial=$trial: $e")
                     push!(all_data, (N=N_val, m=m, time=NaN))
@@ -41,6 +47,7 @@ using DataFrames
     end
 
     # Save all timing data
-    CSV.write("raw_timing_data_n10.csv", all_data)
+    file_name = "/Users/stefanocipolla/Library/CloudStorage/OneDrive-UniversityofSouthampton/Southampton_Work/OptimalDesignWithBoscia/Results/Boscia" * string(n) * "_.csv"
+    CSV.write(file_name, all_data)
 
 

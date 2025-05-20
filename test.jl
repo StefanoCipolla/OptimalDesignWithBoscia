@@ -1,6 +1,6 @@
 using ODWB
 seed = 1
-m = 50
+m = 100
 n = 20
 criterion = "D"
 time_limit = 36000 # 1 hour
